@@ -479,4 +479,49 @@ describe('UNO Call Penalty & Catch Rules', () => {
     expect(result.updatedTargetHand).toHaveLength(3);
     expect(result.updatedRoom?.uno_challenge_target).toBeNull();
   });
+
+  // 9. When playing down to 1 card without calling UNO, catch window opens
+  it('9. When player reaches 1 card remaining without calling UNO, uno_challenge_target is set to that player', () => {
+    const cardToPlay: UnoFlipCard = {
+      id: 'c-play',
+      light: { color: 'red', type: 'number', value: 3 },
+      dark: { color: 'pink', type: 'number', value: 3 },
+    };
+
+    const res = processCardPlay({
+      room: activeRoom,
+      player: alice,
+      players: [alice, bob],
+      card: cardToPlay,
+      drawPile: testDrawPile,
+      discardPile: [],
+      calledUno: false,
+      remainingHandLength: 1, // Alice now has 1 card left
+    });
+
+    expect(res.updatedRoom.uno_challenge_target).toBe('prof-alice');
+  });
+
+  // 10. When player plays down to 1 card and DID call UNO, catch window remains null
+  it('10. When player reaches 1 card remaining and called UNO, uno_challenge_target is null', () => {
+    const cardToPlay: UnoFlipCard = {
+      id: 'c-play',
+      light: { color: 'red', type: 'number', value: 3 },
+      dark: { color: 'pink', type: 'number', value: 3 },
+    };
+
+    const res = processCardPlay({
+      room: activeRoom,
+      player: alice,
+      players: [alice, bob],
+      card: cardToPlay,
+      drawPile: testDrawPile,
+      discardPile: [],
+      calledUno: true,
+      remainingHandLength: 1,
+    });
+
+    expect(res.updatedRoom.uno_challenge_target).toBeNull();
+    expect(res.updatedRoom.uno_called_by).toContain('prof-alice');
+  });
 });

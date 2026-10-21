@@ -40,7 +40,7 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
     : activeSide;
 
   const handleCallUnoClick = async () => {
-    if (isCallingUno || hasCalledUno) return;
+    if (isCallingUno || hasCalledUno || cards.length !== 1) return;
     setIsCallingUno(true);
     playUnoCallSound();
     setJustCalledUno(true);
@@ -74,20 +74,20 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
         {/* Responsive UNO Button with Pulse Reminder */}
         <button
           onClick={handleCallUnoClick}
-          disabled={disabled || isCallingUno || hasCalledUno}
-          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
+          disabled={disabled || isCallingUno || hasCalledUno || cards.length !== 1}
+          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-all ${
             hasCalledUno || justCalledUno
-              ? 'bg-[#27AE60] text-white border border-[#27AE60] shadow-sm'
+              ? 'bg-[#27AE60] text-white border border-[#27AE60] shadow-sm cursor-default'
               : isUnoVulnerable
-              ? 'bg-[#FFCC00] text-[#15191F] ring-2 ring-[#FFCC00] ring-offset-2 ring-offset-[#15191F] animate-pulse shadow-md font-black hover:bg-[#E6B800] scale-105'
-              : cards.length === 2
-              ? 'bg-[#FFCC00] text-[#15191F] hover:bg-[#E6B800]'
-              : 'bg-[#1E232B] text-[#9BA3AF] border border-[#2D333B] hover:text-white'
+              ? 'bg-[#FFCC00] text-[#15191F] ring-2 ring-[#FFCC00] ring-offset-2 ring-offset-[#15191F] animate-pulse shadow-md font-black hover:bg-[#E6B800] scale-105 cursor-pointer'
+              : 'bg-[#1E232B] text-[#9BA3AF]/50 border border-[#2D333B] opacity-50 cursor-not-allowed'
           }`}
           title={
             isUnoVulnerable
               ? 'WARNING: You have 1 card! Call UNO immediately!'
-              : 'Declare UNO when having 1 or 2 cards'
+              : hasCalledUno || justCalledUno
+              ? 'UNO declared!'
+              : 'You can only call UNO when you have 1 card left'
           }
         >
           {hasCalledUno || justCalledUno ? (
@@ -129,7 +129,13 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                   side={displaySide}
                   isPlayable={playable}
                   onClick={() => {
-                    if (playable) onPlayCard(card);
+                    if (playable) {
+                      if (cards.length === 1 && !hasCalledUno && !justCalledUno) {
+                        alert('⚠️ You have 1 card left! You must click "Call UNO" before playing your final card!');
+                        return;
+                      }
+                      onPlayCard(card);
+                    }
                   }}
                   size="md"
                 />

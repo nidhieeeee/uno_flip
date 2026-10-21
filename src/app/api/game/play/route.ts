@@ -156,6 +156,13 @@ export async function POST(req: Request) {
     // 10. Check Win Condition
     let isWinner = false;
     if (remainingHand.length === 0) {
+      // Rule: Player must have called UNO when holding 1 card before playing it to win!
+      if (!currentPlayer.has_called_uno && !calledUno) {
+        return NextResponse.json(
+          { error: 'You must call UNO before playing your last card!', requiresUnoCall: true },
+          { status: 400 }
+        );
+      }
       isWinner = true;
       result.updatedRoom.status = 'finished';
       result.updatedRoom.winner_id = profile.id;
@@ -182,9 +189,19 @@ export async function POST(req: Request) {
 
       await supabase
         .from('game_players')
-        .update({ card_count: updatedOppHand.length })
+        .update({
+          card_count: updatedOppHand.length,
+          has_called_uno: false,
+        })
         .eq('room_id', roomId)
         .eq('profile_id', result.affectedPlayerId);
+
+      // Remove from room uno_called_by if they had previously called UNO
+      if (Array.isArray(result.updatedRoom.uno_called_by)) {
+        result.updatedRoom.uno_called_by = result.updatedRoom.uno_called_by.filter(
+          (id) => id !== result.affectedPlayerId
+        );
+      }
     }
 
     // 12. Save Current Player's Hand & Card Count

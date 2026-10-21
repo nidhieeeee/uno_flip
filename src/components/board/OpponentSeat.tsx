@@ -27,7 +27,7 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
   const cardCount = player.card_count;
 
   // Can this player be challenged for not calling UNO?
-  const canChallenge = (isVulnerable || (cardCount === 1 && !player.has_called_uno)) && !isPenalized;
+  const canChallenge = isVulnerable && cardCount === 1 && !player.has_called_uno && !isPenalized;
 
   return (
     <div

@@ -109,12 +109,17 @@ export async function POST(req: Request) {
       timestamp: Date.now(),
     };
 
+    const updatedUnoCalledBy = Array.isArray(room.uno_called_by)
+      ? room.uno_called_by.filter((id) => id !== profile.id)
+      : [];
+
     await supabase
       .from('game_rooms')
       .update({
         current_turn_seat: nextSeat,
         draw_pile_count: newDrawPile.length,
         uno_challenge_target: null, // Any previous catch window expires when next player draws
+        uno_called_by: updatedUnoCalledBy,
         last_action: actionLog,
         updated_at: new Date().toISOString(),
       })

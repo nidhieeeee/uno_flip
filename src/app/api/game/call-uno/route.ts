@@ -12,18 +12,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Room ID is required' }, { status: 400 });
     }
 
-    const { profile } = await getOrCreateCurrentProfile(req);
+    const { profile, token } = await getOrCreateCurrentProfile(req);
     const supabase = getSupabaseServerClient();
 
     const { data: player } = await supabase
       .from('game_players')
-      .select('id, card_count')
+      .select('id, card_count, has_called_uno')
       .eq('room_id', roomId)
       .eq('profile_id', profile.id)
       .single();
 
     if (!player) {
       return NextResponse.json({ error: 'Player not found in room' }, { status: 404 });
+    }
+
+    // Rule: You can only call UNO when you have exactly 1 card left!
+    if (player.card_count !== 1) {
+      return NextResponse.json(
+        { error: 'You can only call UNO when you have exactly 1 card left!' },
+        { status: 400 }
+      );
+    }
+
+    if (player.has_called_uno) {
+      return NextResponse.json({ success: true, message: 'UNO already declared!', token });
     }
 
     // Set has_called_uno = true on player
@@ -69,7 +81,7 @@ export async function POST(req: Request) {
       details: actionLog,
     });
 
-    return NextResponse.json({ success: true, message: 'UNO called!' });
+    return NextResponse.json({ success: true, message: 'UNO called!', token });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
   }
