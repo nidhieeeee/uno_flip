@@ -12,7 +12,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Room ID is required' }, { status: 400 });
     }
 
-    const { profile } = await getOrCreateCurrentProfile();
+    const { profile } = await getOrCreateCurrentProfile(req);
     const supabase = getSupabaseServerClient();
 
     const { data: player } = await supabase

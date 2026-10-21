@@ -13,7 +13,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Room code or roomId is required' }, { status: 400 });
     }
 
-    const { profile } = await getOrCreateCurrentProfile();
+    const { profile, token } = await getOrCreateCurrentProfile(req);
     const supabase = getSupabaseServerClient();
 
     // Fetch room
@@ -66,14 +66,79 @@ export async function GET(req: Request) {
       is_connected: p.is_connected,
       card_count: p.card_count,
       has_called_uno: p.has_called_uno,
-      profile: p.profiles ? {
-        id: p.profiles.id,
-        nickname: p.profiles.nickname,
-        avatar_color: p.profiles.avatar_color,
-      } : undefined,
+      profile: p.profiles
+        ? {
+            id: p.profiles.id,
+            nickname: p.profiles.nickname,
+            avatar_color: p.profiles.avatar_color,
+          }
+        : undefined,
     }));
 
-    const me = players.find((p) => p.profile_id === profile.id);
+    let me = players.find((p) => p.profile_id === profile.id);
+
+    // Auto-join if player is opening room link in lobby status and not in players
+    if (!me && room.status === 'lobby' && players.length < room.max_players) {
+      const takenSeats = new Set(players.map((p) => p.seat_index));
+      let availableSeat = 0;
+      while (takenSeats.has(availableSeat)) {
+        availableSeat++;
+      }
+
+      if (availableSeat < room.max_players) {
+        const { data: newPlayer } = await supabase
+          .from('game_players')
+          .insert({
+            room_id: room.id,
+            profile_id: profile.id,
+            seat_index: availableSeat,
+            is_ready: false,
+            is_host: false,
+            is_connected: true,
+            card_count: 0,
+          })
+          .select(`
+            id,
+            room_id,
+            profile_id,
+            seat_index,
+            is_ready,
+            is_host,
+            is_connected,
+            card_count,
+            has_called_uno,
+            profiles (
+              id,
+              nickname,
+              avatar_color
+            )
+          `)
+          .maybeSingle();
+
+        if (newPlayer) {
+          const formattedPlayer: GamePlayer = {
+            id: newPlayer.id,
+            room_id: newPlayer.room_id,
+            profile_id: newPlayer.profile_id,
+            seat_index: newPlayer.seat_index,
+            is_ready: newPlayer.is_ready,
+            is_host: newPlayer.is_host,
+            is_connected: newPlayer.is_connected,
+            card_count: newPlayer.card_count,
+            has_called_uno: newPlayer.has_called_uno,
+            profile: (newPlayer as any).profiles
+              ? {
+                  id: (newPlayer as any).profiles.id,
+                  nickname: (newPlayer as any).profiles.nickname,
+                  avatar_color: (newPlayer as any).profiles.avatar_color,
+                }
+              : profile,
+          };
+          players.push(formattedPlayer);
+          me = formattedPlayer;
+        }
+      }
+    }
 
     // Fetch private hand ONLY for the current player
     let myHand: UnoFlipCard[] = [];
@@ -96,6 +161,7 @@ export async function GET(req: Request) {
       me: me || null,
       myHand,
       currentProfile: profile,
+      token,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });

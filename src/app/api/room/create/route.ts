@@ -13,7 +13,7 @@ function generateRoomCode(): string {
 
 export async function POST(req: Request) {
   try {
-    const { profile } = await getOrCreateCurrentProfile();
+    const { profile, token } = await getOrCreateCurrentProfile(req);
     const supabase = getSupabaseServerClient();
 
     let code = generateRoomCode();
@@ -69,6 +69,7 @@ export async function POST(req: Request) {
       success: true,
       roomId: room.id,
       roomCode: room.code,
+      token,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });

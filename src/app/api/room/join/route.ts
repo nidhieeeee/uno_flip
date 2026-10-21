@@ -10,7 +10,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Room code is required' }, { status: 400 });
     }
 
-    const { profile } = await getOrCreateCurrentProfile();
+    const { profile, token } = await getOrCreateCurrentProfile(req);
     const supabase = getSupabaseServerClient();
 
     const normalizedCode = code.trim().toUpperCase();
@@ -52,6 +52,7 @@ export async function POST(req: Request) {
         success: true,
         roomId: room.id,
         roomCode: room.code,
+        token,
         message: 'Reconnected to room',
       });
     }
@@ -90,6 +91,7 @@ export async function POST(req: Request) {
       success: true,
       roomId: room.id,
       roomCode: room.code,
+      token,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });

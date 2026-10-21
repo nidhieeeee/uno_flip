@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase/client';
+import { apiFetch, setClientPlayerToken } from './clientSession';
 import {
   CardColor,
   GamePlayer,
@@ -26,13 +27,17 @@ export function useMultiplayerGame(roomCode: string | null) {
     if (!code) return;
 
     try {
-      const res = await fetch(`/api/game/state?code=${code}`, {
+      const res = await apiFetch(`/api/game/state?code=${code}`, {
         cache: 'no-store',
       });
       const data = await res.json();
 
       if (!res.ok) {
         throw new Error(data.error || 'Failed to fetch room state');
+      }
+
+      if (data.token) {
+        setClientPlayerToken(data.token);
       }
 
       setRoom(data.room);
@@ -55,13 +60,16 @@ export function useMultiplayerGame(roomCode: string | null) {
     let ignore = false;
     if (!roomCode) return;
 
-    fetch(`/api/game/state?code=${roomCode}`, { cache: 'no-store' })
+    apiFetch(`/api/game/state?code=${roomCode}`, { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (!ignore) {
           if (data.error) {
             setError(data.error);
           } else {
+            if (data.token) {
+              setClientPlayerToken(data.token);
+            }
             setRoom(data.room);
             setPlayers(data.players || []);
             setMe(data.me);
@@ -166,7 +174,7 @@ export function useMultiplayerGame(roomCode: string | null) {
     if (!room || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/game/play', {
+      const res = await apiFetch('/api/game/play', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -201,7 +209,7 @@ export function useMultiplayerGame(roomCode: string | null) {
     if (!room || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/game/draw', {
+      const res = await apiFetch('/api/game/draw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId: room.id }),
@@ -224,7 +232,7 @@ export function useMultiplayerGame(roomCode: string | null) {
   const callUno = async () => {
     if (!room) return;
     try {
-      const res = await fetch('/api/game/call-uno', {
+      const res = await apiFetch('/api/game/call-uno', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId: room.id }),
@@ -242,7 +250,7 @@ export function useMultiplayerGame(roomCode: string | null) {
   const challengeUno = async (targetPlayerId: string) => {
     if (!room) return;
     try {
-      const res = await fetch('/api/game/challenge-uno', {
+      const res = await apiFetch('/api/game/challenge-uno', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId: room.id, targetPlayerId }),
@@ -260,14 +268,17 @@ export function useMultiplayerGame(roomCode: string | null) {
   const toggleReady = async (isReady: boolean) => {
     if (!room) return;
     try {
-      const res = await fetch('/api/room/ready', {
+      const res = await apiFetch('/api/room/ready', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId: room.id, isReady }),
       });
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
         throw new Error(data.error || 'Failed to update ready state');
+      }
+      if (data.token) {
+        setClientPlayerToken(data.token);
       }
       await refreshState();
     } catch (err: any) {
@@ -278,7 +289,7 @@ export function useMultiplayerGame(roomCode: string | null) {
   const startGame = async () => {
     if (!room) return;
     try {
-      const res = await fetch('/api/room/start', {
+      const res = await apiFetch('/api/room/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId: room.id }),
@@ -296,7 +307,7 @@ export function useMultiplayerGame(roomCode: string | null) {
   const rematch = async () => {
     if (!room) return;
     try {
-      const res = await fetch('/api/game/rematch', {
+      const res = await apiFetch('/api/game/rematch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId: room.id }),
@@ -314,7 +325,7 @@ export function useMultiplayerGame(roomCode: string | null) {
   const leaveRoom = async () => {
     if (!room) return;
     try {
-      await fetch('/api/room/leave', {
+      await apiFetch('/api/room/leave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId: room.id }),
@@ -326,7 +337,7 @@ export function useMultiplayerGame(roomCode: string | null) {
 
   const updateProfile = async (nickname: string, avatarColor?: string) => {
     try {
-      const res = await fetch('/api/profile', {
+      const res = await apiFetch('/api/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nickname, avatarColor }),
@@ -334,6 +345,9 @@ export function useMultiplayerGame(roomCode: string | null) {
       const data = await res.json();
       if (res.ok && data.profile) {
         setCurrentProfile(data.profile);
+      }
+      if (data.token) {
+        setClientPlayerToken(data.token);
       }
     } catch {
       // Ignored

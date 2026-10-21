@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getOrCreateCurrentProfile, updateCurrentProfile } from '@/lib/game/session';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const { profile } = await getOrCreateCurrentProfile();
-    return NextResponse.json({ profile });
+    const { profile, token } = await getOrCreateCurrentProfile(req);
+    return NextResponse.json({ profile, token });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to fetch profile' }, { status: 500 });
   }
@@ -18,8 +18,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Valid nickname is required' }, { status: 400 });
     }
 
-    const profile = await updateCurrentProfile(nickname, avatarColor);
-    return NextResponse.json({ profile });
+    const { profile, token } = await updateCurrentProfile(nickname, avatarColor, req);
+    return NextResponse.json({ profile, token });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to update profile' }, { status: 500 });
   }

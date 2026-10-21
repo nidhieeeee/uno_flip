@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { PlayerProfile } from '@/lib/game/types';
+import { apiFetch, setClientPlayerToken } from '@/lib/game/clientSession';
 import { HowToPlayModal } from '../modals/HowToPlayModal';
 import { ArrowRight, HelpCircle, Plus, User } from 'lucide-react';
 
@@ -28,11 +29,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const saveNickname = async () => {
     if (!nickname.trim()) return;
     try {
-      await fetch('/api/profile', {
+      const res = await apiFetch('/api/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nickname: nickname.trim() }),
       });
+      const data = await res.json();
+      if (data.token) {
+        setClientPlayerToken(data.token);
+      }
     } catch {
       // Ignored
     }
@@ -46,13 +51,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await saveNickname();
       }
 
-      const res = await fetch('/api/room/create', {
+      const res = await apiFetch('/api/room/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Failed to create room');
+      }
+
+      if (data.token) {
+        setClientPlayerToken(data.token);
       }
 
       onEnterRoom(data.roomCode);
@@ -74,7 +83,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await saveNickname();
       }
 
-      const res = await fetch('/api/room/join', {
+      const res = await apiFetch('/api/room/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: joinCode.trim().toUpperCase() }),
@@ -82,6 +91,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Failed to join room');
+      }
+
+      if (data.token) {
+        setClientPlayerToken(data.token);
       }
 
       onEnterRoom(data.roomCode);
