@@ -45,8 +45,29 @@ export async function POST(req: Request) {
     if (existingPlayer) {
       await supabase
         .from('game_players')
-        .update({ is_connected: true })
+        .update({
+          is_connected: true,
+          disconnected_at: null,
+        })
         .eq('id', existingPlayer.id);
+
+      if (room.status === 'playing') {
+        const actionLog = {
+          type: 'player_reconnected',
+          playerId: profile.id,
+          playerName: profile.nickname,
+          message: `${profile.nickname} reconnected to the match!`,
+          timestamp: Date.now(),
+        };
+
+        await supabase
+          .from('game_rooms')
+          .update({
+            last_action: actionLog,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', room.id);
+      }
 
       return NextResponse.json({
         success: true,

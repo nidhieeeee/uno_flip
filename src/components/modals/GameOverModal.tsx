@@ -52,7 +52,16 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
         <h2 className="text-xl font-bold text-white">
           {isMeWinner ? 'You Won!' : `${winner?.profile?.nickname || 'Player'} Won!`}
         </h2>
-        <p className="text-[#9BA3AF] text-xs mt-1">Game over. Final standings:</p>
+        {room.win_reason === 'forfeit' && (
+          <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-[#ED1C24]/20 border border-[#ED1C24]/50 text-[#ED1C24] text-[10px] font-bold uppercase tracking-wider">
+            Player Forfeit
+          </span>
+        )}
+        <p className="text-[#9BA3AF] text-xs mt-1.5">
+          {room.win_reason === 'forfeit'
+            ? room.last_action?.message || (isMeWinner ? 'Opponent left the game. You win!' : 'Match ended by forfeit.')
+            : 'Game over. Final standings:'}
+        </p>
 
         {/* Final Standings List */}
         <div className="w-full mt-4 bg-[#15191F] rounded-lg p-3 border border-[#2D333B] flex flex-col gap-2">

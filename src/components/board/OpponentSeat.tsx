@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { GamePlayer, Side } from '@/lib/game/types';
-import { Crown, Flame, ShieldAlert } from 'lucide-react';
+import { Crown, Flame, ShieldAlert, WifiOff } from 'lucide-react';
 
 interface OpponentSeatProps {
   player: GamePlayer;
@@ -42,14 +42,18 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
   const initial = nickname.charAt(0).toUpperCase();
   const avatarBg = player.profile?.avatar_color || '#1677E8';
   const cardCount = player.card_count;
+  const isDisconnected = !player.is_connected;
 
   // Can this player be challenged for not calling UNO?
-  const canChallenge = isVulnerable && cardCount === 1 && !player.has_called_uno && !showPenalty;
+  const canChallenge =
+    isVulnerable && cardCount === 1 && !player.has_called_uno && !showPenalty && !isDisconnected;
 
   return (
     <div
       id={`opponent-seat-${player.profile_id}`}
-      className="relative flex flex-col items-center select-none transition-transform"
+      className={`relative flex flex-col items-center select-none transition-transform ${
+        isDisconnected ? 'opacity-70' : ''
+      }`}
     >
       {/* Floating Penalty Announcement Tag */}
       {showPenalty && (
@@ -58,11 +62,21 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
         </div>
       )}
 
+      {/* Disconnected Grace Period Badge */}
+      {!showPenalty && isDisconnected && (
+        <div className="absolute -top-7 z-30 px-2 py-0.5 rounded-full bg-[#ED1C24] text-white text-[9px] font-bold tracking-wider uppercase shadow-md flex items-center gap-1 animate-pulse whitespace-nowrap">
+          <WifiOff className="w-2.5 h-2.5" />
+          <span>Disconnected</span>
+        </div>
+      )}
+
       {/* Player Card Container */}
       <div
         className={`flex flex-col items-center p-2.5 rounded-lg border transition-all ${
           showPenalty
             ? 'bg-[#1E232B] border-[#ED1C24] ring-2 ring-[#ED1C24]/60'
+            : isDisconnected
+            ? 'bg-[#1E232B] border-dashed border-[#ED1C24]/60'
             : isCurrentTurn
             ? 'bg-[#1E232B] border-[#FFCC00]'
             : 'bg-[#15191F] border-[#2D333B]'
@@ -74,6 +88,8 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
             className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-bold text-sm sm:text-base text-white border transition-all ${
               showPenalty
                 ? 'border-[#ED1C24] ring-2 ring-[#ED1C24]'
+                : isDisconnected
+                ? 'border-[#ED1C24]/60'
                 : 'border-white/20'
             }`}
             style={{ backgroundColor: avatarBg }}
@@ -99,14 +115,21 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
           </span>
 
           <div className="flex items-center gap-1 text-[10px]">
-            <span
-              className={`transition-all ${
-                showPenalty ? 'text-[#ED1C24] font-bold' : 'text-[#9BA3AF]'
-              }`}
-            >
-              {cardCount} {cardCount === 1 ? 'card' : 'cards'}
-            </span>
-            {isCurrentTurn && (
+            {isDisconnected ? (
+              <span className="text-[#ED1C24] font-semibold flex items-center gap-0.5">
+                <WifiOff className="w-2.5 h-2.5" />
+                Offline
+              </span>
+            ) : (
+              <span
+                className={`transition-all ${
+                  showPenalty ? 'text-[#ED1C24] font-bold' : 'text-[#9BA3AF]'
+                }`}
+              >
+                {cardCount} {cardCount === 1 ? 'card' : 'cards'}
+              </span>
+            )}
+            {isCurrentTurn && !isDisconnected && (
               <span className="font-bold text-[#FFCC00] uppercase tracking-wider">
                 • Turn
               </span>

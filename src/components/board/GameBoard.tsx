@@ -22,8 +22,11 @@ import {
   RotateCw,
   ShieldAlert,
   Sparkles,
+  UserMinus,
   Volume2,
   VolumeX,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 
 interface GameBoardProps {
@@ -59,6 +62,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const [pendingCard, setPendingCard] = useState<UnoFlipCard | null>(null);
   const [isFromDrawDecision, setIsFromDrawDecision] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [penalizedPlayerId, setPenalizedPlayerId] = useState<string | null>(null);
   const [penaltyAnnouncement, setPenaltyAnnouncement] = useState<{
     message: string;
@@ -336,7 +340,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             <HelpCircle className="w-4 h-4 text-[#FFCC00]" />
           </button>
           <button
-            onClick={onLeaveRoom}
+            onClick={() => setShowLeaveConfirm(true)}
             className="p-2 rounded bg-[#1E232B] hover:bg-red-950/40 border border-[#2D333B] hover:border-[#ED1C24]/50 text-[#9BA3AF] hover:text-[#ED1C24] transition-colors cursor-pointer"
             title="Leave Game"
           >
@@ -358,8 +362,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* Floating Action Announcement Toast */}
       {actionBanner && !penaltyAnnouncement && (
         <div className="absolute top-16 inset-x-0 z-30 flex justify-center pointer-events-none px-4">
-          <div className="bg-[#1E232B] border border-[#2D333B] text-white text-xs sm:text-sm font-medium px-4 py-2 rounded shadow-md flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-[#FFCC00]" />
+          <div className="bg-[#1E232B] border border-[#2D333B] text-white text-xs sm:text-sm font-medium px-4 py-2 rounded-full shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
+            {room.last_action?.type === 'player_left' ? (
+              <UserMinus className="w-4 h-4 text-[#ED1C24]" />
+            ) : room.last_action?.type === 'player_disconnected' ? (
+              <WifiOff className="w-4 h-4 text-[#FFCC00]" />
+            ) : room.last_action?.type === 'player_reconnected' ? (
+              <Wifi className="w-4 h-4 text-[#27AE60]" />
+            ) : (
+              <Sparkles className="w-4 h-4 text-[#FFCC00]" />
+            )}
             <span>{actionBanner}</span>
           </div>
         </div>
@@ -541,6 +553,40 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       />
 
       <HowToPlayModal isOpen={showRules} onClose={() => setShowRules(false)} />
+
+      {/* Leave Game Confirmation Modal */}
+      {showLeaveConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75">
+          <div className="relative w-full max-w-sm rounded-xl bg-[#1E232B] border border-[#2D333B] p-6 shadow-2xl flex flex-col items-center text-center animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-full bg-red-950/60 border border-[#ED1C24]/50 text-[#ED1C24] flex items-center justify-center mb-3">
+              <LogOut className="w-6 h-6 stroke-[2.2]" />
+            </div>
+
+            <h3 className="text-lg font-bold text-white">Leave Match?</h3>
+            <p className="text-[#9BA3AF] text-xs sm:text-sm mt-2 leading-relaxed">
+              Are you sure you want to leave? If you forfeit, the remaining player(s) will continue or win immediately.
+            </p>
+
+            <div className="flex gap-2 w-full mt-6">
+              <button
+                onClick={() => setShowLeaveConfirm(false)}
+                className="flex-1 py-2.5 px-3 rounded-lg font-medium text-xs text-[#9BA3AF] border border-[#2D333B] hover:bg-[#15191F] hover:text-white transition-colors cursor-pointer"
+              >
+                Stay in Game
+              </button>
+              <button
+                onClick={async () => {
+                  setShowLeaveConfirm(false);
+                  await onLeaveRoom();
+                }}
+                className="flex-1 py-2.5 px-3 rounded-lg font-bold text-xs uppercase tracking-wider bg-[#ED1C24] hover:bg-[#D3141B] text-white transition-colors cursor-pointer shadow-sm"
+              >
+                Forfeit & Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

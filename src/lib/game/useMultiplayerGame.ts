@@ -104,6 +104,7 @@ export function useMultiplayerGame(roomCode: string | null) {
     const channel = supabase.channel(`room:${roomId}`, {
       config: {
         broadcast: { ack: false },
+        presence: { key: profileId },
       },
     });
 
@@ -123,7 +124,7 @@ export function useMultiplayerGame(roomCode: string | null) {
       }
     );
 
-    // Listen for changes on game_players (joins, leaves, ready, card counts)
+    // Listen for changes on game_players (joins, leaves, ready, card counts, disconnects)
     channel.on(
       'postgres_changes',
       {
@@ -154,16 +155,89 @@ export function useMultiplayerGame(roomCode: string | null) {
       }
     );
 
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        // Connected to Realtime
+    // Presence: Detect unexpected disconnections
+    channel.on('presence', { event: 'leave' }, async ({ key, leftPresences }: any) => {
+      const leftProfileId = key || leftPresences?.[0]?.profileId;
+      if (leftProfileId && leftProfileId !== profileId && room.status === 'playing') {
+        try {
+          await apiFetch('/api/room/disconnect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roomId, profileId: leftProfileId }),
+          });
+        } catch {
+          // Handled on server
+        }
       }
     });
 
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        try {
+          await channel.track({
+            profileId,
+            nickname: currentProfile.nickname,
+            onlineAt: new Date().toISOString(),
+          });
+        } catch {
+          // Fallback
+        }
+      }
+    });
+
+    const handleBeforeUnload = () => {
+      if (room.status === 'playing') {
+        try {
+          navigator.sendBeacon?.(
+            '/api/room/disconnect',
+            new Blob([JSON.stringify({ roomId, profileId })], { type: 'application/json' })
+          );
+        } catch {
+          // Ignored
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       supabase.removeChannel(channel);
     };
-  }, [room?.id, currentProfile?.id, refreshState]);
+  }, [room?.id, room?.status, currentProfile?.id, currentProfile?.nickname, refreshState]);
+
+  // Server-authoritative disconnect grace period monitor (15 seconds)
+  useEffect(() => {
+    if (!room?.id || room.status !== 'playing') return;
+
+    const roomId = room.id;
+    const interval = setInterval(async () => {
+      const now = Date.now();
+      for (const player of players) {
+        if (
+          player.profile_id !== currentProfile?.id &&
+          !player.is_connected &&
+          player.disconnected_at
+        ) {
+          const disconnectedTime = new Date(player.disconnected_at).getTime();
+          if (now - disconnectedTime >= 15000) {
+            try {
+              await apiFetch('/api/room/disconnect-timeout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roomId, targetPlayerId: player.profile_id }),
+              });
+              await refreshState();
+            } catch {
+              // Server validates authority
+            }
+          }
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [room?.id, room?.status, players, currentProfile?.id, refreshState]);
 
   // Actions
   const playCard = async (

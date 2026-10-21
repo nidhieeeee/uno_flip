@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     // 2. Fetch Players
     const { data: playersData } = await supabase
       .from('game_players')
-      .select('id, profile_id, seat_index')
+      .select('id, profile_id, seat_index, is_connected')
       .eq('room_id', roomId)
       .order('seat_index', { ascending: true });
 
@@ -50,6 +50,10 @@ export async function POST(req: Request) {
 
     if (!currentPlayer) {
       return NextResponse.json({ error: 'You are not in this game' }, { status: 403 });
+    }
+
+    if (!currentPlayer.is_connected) {
+      return NextResponse.json({ error: 'You are disconnected and cannot draw' }, { status: 403 });
     }
 
     if (currentPlayer.seat_index !== room.current_turn_seat) {

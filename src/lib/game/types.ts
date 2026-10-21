@@ -55,6 +55,7 @@ export interface GamePlayer {
   is_ready: boolean;
   is_host: boolean;
   is_connected: boolean;
+  disconnected_at?: string | null;
   card_count: number;
   has_called_uno: boolean;
   profile?: PlayerProfile;
@@ -81,6 +82,7 @@ export interface GameRoom {
   draw_pile_count: number;
   draw_penalty: number;
   winner_id: string | null;
+  win_reason?: string | null;
   uno_called_by: string[];
   pending_color_selection: boolean;
   uno_challenge_target?: string | null;
@@ -104,7 +106,11 @@ export interface GameActionLog {
     | 'color_select'
     | 'call_uno'
     | 'challenge_uno'
-    | 'win';
+    | 'win'
+    | 'player_left'
+    | 'player_disconnected'
+    | 'player_reconnected'
+    | 'forfeit';
   playerId: string;
   playerName: string;
   targetPlayerId?: string;

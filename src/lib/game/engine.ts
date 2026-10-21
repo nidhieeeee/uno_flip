@@ -58,14 +58,52 @@ export function isValidPlay(
 }
 
 /**
- * Calculates the next turn seat index given current seat, player count, direction, and step.
+ * Finds the next eligible active seat given the current seat, active players list, direction, and step.
+ * Correctly accounts for non-contiguous seat indices when players have departed or disconnected.
  */
-export function calculateNextSeat(
+export function findNextActiveSeat(
   currentSeat: number,
-  playerCount: number,
+  activePlayers: { seat_index: number }[],
   direction: 1 | -1,
   step = 1
 ): number {
+  if (activePlayers.length === 0) return 0;
+  if (activePlayers.length === 1) return activePlayers[0].seat_index;
+
+  // Sort active seats in ascending order
+  const sortedSeats = activePlayers.map((p) => p.seat_index).sort((a, b) => a - b);
+
+  let currentIndex = sortedSeats.indexOf(currentSeat);
+  if (currentIndex === -1) {
+    // Current seat was removed; find closest position based on direction
+    if (direction === 1) {
+      const nextIdx = sortedSeats.findIndex((s) => s > currentSeat);
+      currentIndex = nextIdx !== -1 ? nextIdx - 1 : sortedSeats.length - 1;
+    } else {
+      const prevIdx = sortedSeats.slice().reverse().findIndex((s) => s < currentSeat);
+      currentIndex = prevIdx !== -1 ? sortedSeats.length - 1 - prevIdx + 1 : 0;
+    }
+  }
+
+  const total = sortedSeats.length;
+  const delta = direction * step;
+  const targetIndex = ((currentIndex + delta) % total + total) % total;
+  return sortedSeats[targetIndex];
+}
+
+/**
+ * Calculates the next turn seat index given current seat, player count or active players array, direction, and step.
+ */
+export function calculateNextSeat(
+  currentSeat: number,
+  playerCountOrPlayers: number | { seat_index: number }[],
+  direction: 1 | -1,
+  step = 1
+): number {
+  if (Array.isArray(playerCountOrPlayers)) {
+    return findNextActiveSeat(currentSeat, playerCountOrPlayers, direction, step);
+  }
+  const playerCount = playerCountOrPlayers;
   if (playerCount <= 0) return 0;
   const delta = direction * step;
   return ((currentSeat + delta) % playerCount + playerCount) % playerCount;
@@ -243,7 +281,7 @@ export function processCardPlay(params: ProcessCardPlayParams): PlayCardResult {
 
     case 'draw_one': { // Light Side (+1)
       nextActiveColor = activeFace.color as CardColor;
-      const targetSeat = calculateNextSeat(player.seat_index, totalPlayers, nextDirection, 1);
+      const targetSeat = calculateNextSeat(player.seat_index, players, nextDirection, 1);
       const targetPlayer = players.find((p) => p.seat_index === targetSeat);
       if (targetPlayer) {
         affectedPlayerId = targetPlayer.profile_id;
@@ -258,7 +296,7 @@ export function processCardPlay(params: ProcessCardPlayParams): PlayCardResult {
 
     case 'draw_five': { // Dark Side (+5)
       nextActiveColor = activeFace.color as CardColor;
-      const targetSeat = calculateNextSeat(player.seat_index, totalPlayers, nextDirection, 1);
+      const targetSeat = calculateNextSeat(player.seat_index, players, nextDirection, 1);
       const targetPlayer = players.find((p) => p.seat_index === targetSeat);
       if (targetPlayer) {
         affectedPlayerId = targetPlayer.profile_id;
@@ -288,7 +326,7 @@ export function processCardPlay(params: ProcessCardPlayParams): PlayCardResult {
 
     case 'wild_draw_two': { // Light Side
       nextActiveColor = chosenColor || null;
-      const targetSeat = calculateNextSeat(player.seat_index, totalPlayers, nextDirection, 1);
+      const targetSeat = calculateNextSeat(player.seat_index, players, nextDirection, 1);
       const targetPlayer = players.find((p) => p.seat_index === targetSeat);
       if (targetPlayer) {
         affectedPlayerId = targetPlayer.profile_id;
@@ -303,7 +341,7 @@ export function processCardPlay(params: ProcessCardPlayParams): PlayCardResult {
 
     case 'wild_draw_color': { // Dark Side
       nextActiveColor = chosenColor || null;
-      const targetSeat = calculateNextSeat(player.seat_index, totalPlayers, nextDirection, 1);
+      const targetSeat = calculateNextSeat(player.seat_index, players, nextDirection, 1);
       const targetPlayer = players.find((p) => p.seat_index === targetSeat);
       if (targetPlayer && chosenColor && DARK_COLORS.includes(chosenColor as DarkColor)) {
         affectedPlayerId = targetPlayer.profile_id;
@@ -321,7 +359,7 @@ export function processCardPlay(params: ProcessCardPlayParams): PlayCardResult {
   const nextSeat =
     step === 0
       ? player.seat_index // Same player (Skip Everyone)
-      : calculateNextSeat(player.seat_index, totalPlayers, nextDirection, step);
+      : calculateNextSeat(player.seat_index, players, nextDirection, step);
 
   // UNO declaration status & catch window target
   let unoCalledBy = [...(room.uno_called_by || [])];
@@ -541,7 +579,7 @@ export function processTurnTimeout(params: TurnTimeoutParams): TurnTimeoutResult
 
   // If a draw decision is pending, resolve it by keeping the card without drawing another card
   if (room.pending_draw_decision && room.pending_draw_decision.player_id === currentPlayer.profile_id) {
-    const nextSeat = calculateNextSeat(currentPlayer.seat_index, players.length, room.direction, 1);
+    const nextSeat = calculateNextSeat(currentPlayer.seat_index, players, room.direction, 1);
     const actionLog: GameActionLog = {
       type: 'pass',
       playerId: currentPlayer.profile_id,
@@ -568,7 +606,7 @@ export function processTurnTimeout(params: TurnTimeoutParams): TurnTimeoutResult
   // Otherwise draw exactly 1 penalty card and advance the turn
   const drawResult = drawFromPile(drawPile, discardPile, 1);
   const drawnCard = drawResult.drawn[0];
-  const nextSeat = calculateNextSeat(currentPlayer.seat_index, players.length, room.direction, 1);
+  const nextSeat = calculateNextSeat(currentPlayer.seat_index, players, room.direction, 1);
 
   const actionLog: GameActionLog = {
     type: 'draw',
@@ -830,5 +868,199 @@ export function processDrawDecision(params: ProcessDrawDecisionParams): ProcessD
     actionLog: playResult.actionLog,
     affectedPlayerId: playResult.affectedPlayerId,
     penaltyDrawnCards: playResult.penaltyDrawnCards,
+  };
+}
+
+export interface PlayerDepartureParams {
+  room: GameRoom;
+  players: GamePlayer[];
+  departingPlayerId: string;
+  reason?: 'leave' | 'forfeit' | 'disconnect_timeout';
+  currentTime?: number;
+  turnDurationMs?: number;
+}
+
+export interface PlayerDepartureResult {
+  success: boolean;
+  error?: string;
+  isGameOver: boolean;
+  winnerPlayerId?: string | null;
+  winReason?: string | null;
+  updatedRoom: Partial<GameRoom>;
+  remainingPlayers: GamePlayer[];
+  departedPlayer: GamePlayer;
+  actionLog: GameActionLog;
+}
+
+/**
+ * Authoritative pure engine function for handling player departures, forfeits, and disconnect timeouts.
+ * Handles 2-player forfeit (immediate winner declaration) and 3+ player continuation (skipping in turn rotation,
+ * preserving game state, cancelling pending decisions/penalties, resetting timer if active turn).
+ */
+export function processPlayerDeparture(params: PlayerDepartureParams): PlayerDepartureResult {
+  const { room, players, departingPlayerId, reason = 'leave' } = params;
+  const now = params.currentTime ?? Date.now();
+  const turnDurationMs = params.turnDurationMs ?? 30000;
+
+  const departedPlayer = players.find((p) => p.profile_id === departingPlayerId);
+  if (!departedPlayer) {
+    return {
+      success: false,
+      error: 'Departing player not found in room',
+      isGameOver: false,
+      updatedRoom: {},
+      remainingPlayers: players,
+      departedPlayer: players[0] || ({} as GamePlayer),
+      actionLog: {} as GameActionLog,
+    };
+  }
+
+  const remainingPlayers = players.filter((p) => p.profile_id !== departingPlayerId);
+  const departedName = departedPlayer.profile?.nickname || 'Player';
+
+  // If match is not currently playing (e.g. lobby or finished)
+  if (room.status !== 'playing') {
+    const actionLog: GameActionLog = {
+      type: 'player_left',
+      playerId: departedPlayer.profile_id,
+      playerName: departedName,
+      message: `${departedName} left the room.`,
+      timestamp: now,
+    };
+
+    return {
+      success: true,
+      isGameOver: false,
+      updatedRoom: {
+        last_action: actionLog,
+      },
+      remainingPlayers,
+      departedPlayer,
+      actionLog,
+    };
+  }
+
+  // 1. If 0 players remain: game is abandoned
+  if (remainingPlayers.length === 0) {
+    const actionLog: GameActionLog = {
+      type: 'player_left',
+      playerId: departedPlayer.profile_id,
+      playerName: departedName,
+      message: `${departedName} left the game. Match abandoned.`,
+      timestamp: now,
+    };
+
+    return {
+      success: true,
+      isGameOver: true,
+      updatedRoom: {
+        status: 'abandoned',
+        turn_deadline: null,
+        uno_declaration_deadline: null,
+        uno_declaration_player_id: null,
+        pending_draw_decision: null,
+        last_action: actionLog,
+      },
+      remainingPlayers,
+      departedPlayer,
+      actionLog,
+    };
+  }
+
+  // 2. If exactly ONE player remains (2-player game forfeit or last survivor):
+  // Immediately declare the remaining active player the winner!
+  if (remainingPlayers.length === 1) {
+    const winner = remainingPlayers[0];
+    const winnerName = winner.profile?.nickname || 'Player';
+    const message = `${departedName} left the game. ${winnerName} wins!`;
+
+    const actionLog: GameActionLog = {
+      type: 'win',
+      playerId: winner.profile_id,
+      playerName: winnerName,
+      message,
+      timestamp: now,
+    };
+
+    return {
+      success: true,
+      isGameOver: true,
+      winnerPlayerId: winner.profile_id,
+      winReason: 'forfeit',
+      updatedRoom: {
+        status: 'finished',
+        winner_id: winner.profile_id,
+        win_reason: 'forfeit',
+        turn_deadline: null,
+        uno_declaration_deadline: null,
+        uno_declaration_player_id: null,
+        pending_draw_decision: null,
+        last_action: actionLog,
+      },
+      remainingPlayers,
+      departedPlayer,
+      actionLog,
+    };
+  }
+
+  // 3. Three or more players: match continues with remaining players
+  const wasCurrentTurn = room.current_turn_seat === departedPlayer.seat_index;
+  let nextTurnSeat = room.current_turn_seat;
+  let nextTurnStartedAt = room.turn_started_at;
+  let nextTurnDeadline = room.turn_deadline;
+
+  if (wasCurrentTurn) {
+    // Advance turn immediately to next eligible active player and reset turn timer
+    nextTurnSeat = findNextActiveSeat(departedPlayer.seat_index, remainingPlayers, room.direction, 1);
+    nextTurnStartedAt = new Date(now).toISOString();
+    nextTurnDeadline = new Date(now + turnDurationMs).toISOString();
+  }
+
+  // Safely cancel / resolve pending decisions or UNO deadlines belonging to departed player
+  const pendingDraw =
+    room.pending_draw_decision?.player_id === departingPlayerId
+      ? null
+      : room.pending_draw_decision;
+
+  const unoDeclarationDeadline =
+    room.uno_declaration_player_id === departingPlayerId
+      ? null
+      : room.uno_declaration_deadline;
+
+  const unoDeclarationPlayerId =
+    room.uno_declaration_player_id === departingPlayerId
+      ? null
+      : room.uno_declaration_player_id;
+
+  const unoChallengeTarget =
+    room.uno_challenge_target === departingPlayerId
+      ? null
+      : room.uno_challenge_target;
+
+  const message = `${departedName} left. Continuing with ${remainingPlayers.length} players.`;
+  const actionLog: GameActionLog = {
+    type: 'player_left',
+    playerId: departedPlayer.profile_id,
+    playerName: departedName,
+    message,
+    timestamp: now,
+  };
+
+  return {
+    success: true,
+    isGameOver: false,
+    updatedRoom: {
+      current_turn_seat: nextTurnSeat,
+      turn_started_at: nextTurnStartedAt,
+      turn_deadline: nextTurnDeadline,
+      pending_draw_decision: pendingDraw,
+      uno_declaration_deadline: unoDeclarationDeadline,
+      uno_declaration_player_id: unoDeclarationPlayerId,
+      uno_challenge_target: unoChallengeTarget,
+      last_action: actionLog,
+    },
+    remainingPlayers,
+    departedPlayer,
+    actionLog,
   };
 }

@@ -81,6 +81,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'You are not a player in this room' }, { status: 403 });
     }
 
+    if (!currentPlayer.is_connected) {
+      return NextResponse.json({ error: 'You are disconnected and cannot make moves' }, { status: 403 });
+    }
+
     // 3. Verify it is this player's turn
     if (currentPlayer.seat_index !== room.current_turn_seat) {
       return NextResponse.json({ error: "It is not your turn!" }, { status: 400 });
