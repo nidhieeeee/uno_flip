@@ -53,7 +53,12 @@ export async function POST(req: Request) {
     }
 
     if (!currentPlayer.is_connected) {
-      return NextResponse.json({ error: 'You are disconnected and cannot draw' }, { status: 403 });
+      // Player is actively submitting a draw; restore their connection status
+      await supabase
+        .from('game_players')
+        .update({ is_connected: true, disconnected_at: null })
+        .eq('id', currentPlayer.id);
+      currentPlayer.is_connected = true;
     }
 
     if (currentPlayer.seat_index !== room.current_turn_seat) {

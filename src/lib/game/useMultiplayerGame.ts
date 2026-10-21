@@ -94,7 +94,18 @@ export function useMultiplayerGame(roomCode: string | null) {
     };
   }, [roomCode]);
 
-  // Realtime subscription setup
+  const roomRef = useRef(room);
+  roomRef.current = room;
+
+  const currentProfileRef = useRef(currentProfile);
+  currentProfileRef.current = currentProfile;
+
+  const refreshStateRef = useRef(refreshState);
+  refreshStateRef.current = refreshState;
+
+  const leaveTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  // Realtime subscription setup - only re-subscribe if room.id or currentProfile.id changes
   useEffect(() => {
     if (!room?.id || !currentProfile?.id) return;
 
@@ -135,7 +146,7 @@ export function useMultiplayerGame(roomCode: string | null) {
       },
       () => {
         // Refresh players list
-        refreshState();
+        refreshStateRef.current();
       }
     );
 
@@ -155,19 +166,40 @@ export function useMultiplayerGame(roomCode: string | null) {
       }
     );
 
-    // Presence: Detect unexpected disconnections
-    channel.on('presence', { event: 'leave' }, async ({ key, leftPresences }: any) => {
+    // Presence: Detect unexpected disconnections with debounce to avoid false alarms
+    channel.on('presence', { event: 'leave' }, ({ key, leftPresences }: any) => {
       const leftProfileId = key || leftPresences?.[0]?.profileId;
-      if (leftProfileId && leftProfileId !== profileId && room.status === 'playing') {
-        try {
-          await apiFetch('/api/room/disconnect', {
+      if (!leftProfileId || leftProfileId === profileId) return;
+
+      if (leaveTimersRef.current.has(leftProfileId)) {
+        clearTimeout(leaveTimersRef.current.get(leftProfileId)!);
+      }
+
+      // Check after 6 seconds: did this player actually leave, or was it a brief reconnect/render?
+      const timer = setTimeout(() => {
+        const state = channel.presenceState();
+        const isStillPresent = Object.values(state).some((presences: any) =>
+          presences.some((p: any) => p.profileId === leftProfileId)
+        );
+
+        if (!isStillPresent && roomRef.current?.status === 'playing') {
+          apiFetch('/api/room/disconnect', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ roomId, profileId: leftProfileId }),
-          });
-        } catch {
-          // Handled on server
+          }).catch(() => {});
         }
+        leaveTimersRef.current.delete(leftProfileId);
+      }, 6000);
+
+      leaveTimersRef.current.set(leftProfileId, timer);
+    });
+
+    channel.on('presence', { event: 'join' }, ({ key, newPresences }: any) => {
+      const joinedProfileId = key || newPresences?.[0]?.profileId;
+      if (joinedProfileId && leaveTimersRef.current.has(joinedProfileId)) {
+        clearTimeout(leaveTimersRef.current.get(joinedProfileId)!);
+        leaveTimersRef.current.delete(joinedProfileId);
       }
     });
 
@@ -176,7 +208,7 @@ export function useMultiplayerGame(roomCode: string | null) {
         try {
           await channel.track({
             profileId,
-            nickname: currentProfile.nickname,
+            nickname: currentProfileRef.current?.nickname || 'Player',
             onlineAt: new Date().toISOString(),
           });
         } catch {
@@ -186,7 +218,7 @@ export function useMultiplayerGame(roomCode: string | null) {
     });
 
     const handleBeforeUnload = () => {
-      if (room.status === 'playing') {
+      if (roomRef.current?.status === 'playing') {
         try {
           navigator.sendBeacon?.(
             '/api/room/disconnect',
@@ -202,9 +234,11 @@ export function useMultiplayerGame(roomCode: string | null) {
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      leaveTimersRef.current.forEach((t) => clearTimeout(t));
+      leaveTimersRef.current.clear();
       supabase.removeChannel(channel);
     };
-  }, [room?.id, room?.status, currentProfile?.id, currentProfile?.nickname, refreshState]);
+  }, [room?.id, currentProfile?.id]);
 
   // Server-authoritative disconnect grace period monitor (15 seconds)
   useEffect(() => {

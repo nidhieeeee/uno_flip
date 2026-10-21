@@ -42,7 +42,7 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
   const initial = nickname.charAt(0).toUpperCase();
   const avatarBg = player.profile?.avatar_color || '#1677E8';
   const cardCount = player.card_count;
-  const isDisconnected = !player.is_connected;
+  const isDisconnected = !player.is_connected && Boolean(player.disconnected_at);
 
   // Can this player be challenged for not calling UNO?
   const canChallenge =

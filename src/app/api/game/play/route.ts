@@ -82,7 +82,12 @@ export async function POST(req: Request) {
     }
 
     if (!currentPlayer.is_connected) {
-      return NextResponse.json({ error: 'You are disconnected and cannot make moves' }, { status: 403 });
+      // Player is actively submitting a move; restore their connection status
+      await supabase
+        .from('game_players')
+        .update({ is_connected: true, disconnected_at: null })
+        .eq('id', currentPlayer.id);
+      currentPlayer.is_connected = true;
     }
 
     // 3. Verify it is this player's turn
