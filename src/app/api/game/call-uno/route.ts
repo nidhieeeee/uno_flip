@@ -69,6 +69,8 @@ export async function POST(req: Request) {
       .update({
         uno_called_by: unoCalledBy,
         uno_challenge_target: roomData?.uno_challenge_target === profile.id ? null : (roomData?.uno_challenge_target ?? null),
+        uno_declaration_deadline: null,
+        uno_declaration_player_id: null,
         last_action: actionLog,
         updated_at: new Date().toISOString(),
       })

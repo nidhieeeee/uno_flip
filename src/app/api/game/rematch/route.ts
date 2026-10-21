@@ -96,6 +96,9 @@ export async function POST(req: Request) {
       timestamp: Date.now(),
     };
 
+    const now = new Date();
+    const turnDeadline = new Date(now.getTime() + 30000);
+
     await supabase
       .from('game_rooms')
       .update({
@@ -109,9 +112,15 @@ export async function POST(req: Request) {
         draw_penalty: 0,
         winner_id: null,
         uno_called_by: [],
+        uno_challenge_target: null,
+        uno_declaration_deadline: null,
+        uno_declaration_player_id: null,
+        pending_draw_decision: null,
+        turn_started_at: now.toISOString(),
+        turn_deadline: turnDeadline.toISOString(),
         pending_color_selection: false,
         last_action: rematchAction,
-        updated_at: new Date().toISOString(),
+        updated_at: now.toISOString(),
       })
       .eq('id', roomId);
 

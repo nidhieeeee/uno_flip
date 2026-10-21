@@ -28,6 +28,7 @@ function UnoFlipGame() {
     error,
     playCard,
     drawCard,
+    submitDrawDecision,
     callUno,
     challengeUno,
     toggleReady,
@@ -137,6 +138,7 @@ function UnoFlipGame() {
       currentProfile={currentProfile}
       onPlayCard={playCard}
       onDrawCard={drawCard}
+      onSubmitDrawDecision={submitDrawDecision}
       onCallUno={callUno}
       onChallengeUno={challengeUno}
       onRematch={rematch}

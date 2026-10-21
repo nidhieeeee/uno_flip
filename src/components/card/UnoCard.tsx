@@ -212,9 +212,9 @@ export const UnoCard: React.FC<UnoCardProps> = ({
   return (
     <div
       onClick={isPlayable && onClick ? onClick : undefined}
-      className={`relative select-none transition-all duration-150 ${sizeStyles} ${
+      className={`relative select-none transition-colors duration-150 ${sizeStyles} ${
         isPlayable
-          ? 'cursor-pointer -translate-y-2 ring-2 ring-[#FFCC00] hover:-translate-y-3'
+          ? 'cursor-pointer ring-2 ring-[#FFCC00]'
           : 'cursor-default opacity-95'
       } ${className}`}
     >

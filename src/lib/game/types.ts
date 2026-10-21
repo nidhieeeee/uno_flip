@@ -60,6 +60,13 @@ export interface GamePlayer {
   profile?: PlayerProfile;
 }
 
+export interface PendingDrawDecision {
+  player_id: string;
+  card_id: string;
+  card: UnoFlipCard;
+  decision_deadline: string;
+}
+
 export interface GameRoom {
   id: string;
   code: string;
@@ -77,6 +84,11 @@ export interface GameRoom {
   uno_called_by: string[];
   pending_color_selection: boolean;
   uno_challenge_target?: string | null;
+  turn_started_at?: string | null;
+  turn_deadline?: string | null;
+  uno_declaration_deadline?: string | null;
+  uno_declaration_player_id?: string | null;
+  pending_draw_decision?: PendingDrawDecision | null;
   last_action: GameActionLog | null;
   created_at: string;
   updated_at: string;

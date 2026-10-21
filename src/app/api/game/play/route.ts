@@ -166,6 +166,10 @@ export async function POST(req: Request) {
       isWinner = true;
       result.updatedRoom.status = 'finished';
       result.updatedRoom.winner_id = profile.id;
+      result.updatedRoom.turn_deadline = null;
+      result.updatedRoom.turn_started_at = null;
+      result.updatedRoom.uno_declaration_deadline = null;
+      result.updatedRoom.uno_declaration_player_id = null;
       result.actionLog.message = `🎉 ${currentPlayer.profile?.nickname || 'Player'} has won the game!`;
     }
 

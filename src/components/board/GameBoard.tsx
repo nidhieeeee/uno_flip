@@ -11,6 +11,7 @@ import { OpponentSeat } from './OpponentSeat';
 import { ColorPickerModal } from '../modals/ColorPickerModal';
 import { GameOverModal } from '../modals/GameOverModal';
 import { HowToPlayModal } from '../modals/HowToPlayModal';
+import { DrawDecisionModal } from '../modals/DrawDecisionModal';
 import { isSoundMuted, playPenaltySound, toggleSoundMuted } from '@/lib/audio/sound';
 import {
   Clock,
@@ -33,6 +34,7 @@ interface GameBoardProps {
   currentProfile: PlayerProfile | null;
   onPlayCard: (cardId: string, chosenColor?: CardColor, calledUno?: boolean) => Promise<any>;
   onDrawCard: () => void;
+  onSubmitDrawDecision?: (action: 'play' | 'keep', chosenColor?: CardColor) => Promise<any>;
   onCallUno: () => void;
   onChallengeUno: (targetPlayerId: string) => void;
   onRematch: () => void;
@@ -47,6 +49,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   currentProfile,
   onPlayCard,
   onDrawCard,
+  onSubmitDrawDecision,
   onCallUno,
   onChallengeUno,
   onRematch,
@@ -54,6 +57,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 }) => {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [pendingCard, setPendingCard] = useState<UnoFlipCard | null>(null);
+  const [isFromDrawDecision, setIsFromDrawDecision] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [penalizedPlayerId, setPenalizedPlayerId] = useState<string | null>(null);
   const [penaltyAnnouncement, setPenaltyAnnouncement] = useState<{
@@ -61,6 +65,26 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     isTargetMe: boolean;
   } | null>(null);
   const [soundMuted, setSoundMutedState] = useState(isSoundMuted());
+  const [turnSecondsLeft, setTurnSecondsLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!room.turn_deadline || room.status !== 'playing') {
+      setTurnSecondsLeft(null);
+      return;
+    }
+
+    const updateTimer = () => {
+      const remaining = Math.max(
+        0,
+        Math.ceil((new Date(room.turn_deadline!).getTime() - Date.now()) / 1000)
+      );
+      setTurnSecondsLeft(remaining);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 200);
+    return () => clearInterval(interval);
+  }, [room.turn_deadline, room.status]);
 
   const boardRef = useRef<HTMLDivElement>(null);
   const prevSideRef = useRef<Side>(room.current_side);
@@ -200,7 +224,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const handleColorSelected = async (chosenColor: CardColor) => {
     if (!pendingCard) return;
     setShowColorPicker(false);
-    await onPlayCard(pendingCard.id, chosenColor, me?.has_called_uno);
+    if (isFromDrawDecision) {
+      setIsFromDrawDecision(false);
+      if (onSubmitDrawDecision) {
+        await onSubmitDrawDecision('play', chosenColor);
+      }
+    } else {
+      await onPlayCard(pendingCard.id, chosenColor, me?.has_called_uno);
+    }
     setPendingCard(null);
   };
 
@@ -364,10 +395,33 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           />
         </div>
 
-        {/* Turn Prompt Hint */}
-        {isMyTurn && (
-          <div className="mt-3 text-xs sm:text-sm font-bold text-[#FFCC00] tracking-wide flex items-center gap-1.5">
-            <span>YOUR TURN: Play a matching card or draw from the deck</span>
+        {/* Turn Prompt Hint & Synchronized Turn Countdown */}
+        {room.status === 'playing' && (
+          <div className="mt-3 flex flex-col sm:flex-row items-center gap-2">
+            {turnSecondsLeft !== null && (
+              <div
+                className={`px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase flex items-center gap-1.5 transition-all shadow-md ${
+                  turnSecondsLeft <= 5
+                    ? 'bg-[#ED1C24] text-white animate-pulse ring-2 ring-[#ED1C24]/60'
+                    : turnSecondsLeft <= 10
+                    ? 'bg-[#E65100] text-white'
+                    : 'bg-[#15191F] border border-[#2D333B] text-[#FFCC00]'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>
+                  {room.pending_draw_decision
+                    ? `DECISION: ${turnSecondsLeft}s`
+                    : `TURN: ${turnSecondsLeft}s`}
+                </span>
+              </div>
+            )}
+
+            {isMyTurn && (
+              <div className="text-xs sm:text-sm font-bold text-[#FFCC00] tracking-wide flex items-center gap-1.5">
+                <span>YOUR TURN: Play a matching card or draw from the deck</span>
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -384,6 +438,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           onPlayCard={handleCardClick}
           onCallUno={onCallUno}
           hasCalledUno={me?.has_called_uno ?? false}
+          unoDeclarationDeadline={
+            room.uno_declaration_player_id === me?.profile_id
+              ? room.uno_declaration_deadline
+              : null
+          }
           isPenalized={penalizedPlayerId === me?.profile_id}
         />
       </footer>
@@ -395,7 +454,39 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         onSelectColor={handleColorSelected}
         onCancel={() => {
           setShowColorPicker(false);
+          setIsFromDrawDecision(false);
           setPendingCard(null);
+        }}
+      />
+
+      {/* Draw and Decide Modal */}
+      <DrawDecisionModal
+        isOpen={Boolean(
+          room.status === 'playing' &&
+          room.pending_draw_decision &&
+          room.pending_draw_decision.player_id === me?.profile_id
+        )}
+        card={room.pending_draw_decision?.card || null}
+        side={room.current_side}
+        decisionDeadline={room.pending_draw_decision?.decision_deadline}
+        onKeep={async () => {
+          if (onSubmitDrawDecision) {
+            await onSubmitDrawDecision('keep');
+          }
+        }}
+        onPlay={async () => {
+          const card = room.pending_draw_decision?.card;
+          if (!card) return;
+          const activeFace = room.current_side === 'light' ? card.light : card.dark;
+          if (activeFace.color === 'wild') {
+            setPendingCard(card);
+            setIsFromDrawDecision(true);
+            setShowColorPicker(true);
+            return;
+          }
+          if (onSubmitDrawDecision) {
+            await onSubmitDrawDecision('play');
+          }
         }}
       />
 

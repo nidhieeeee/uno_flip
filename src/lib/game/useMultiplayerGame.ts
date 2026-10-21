@@ -222,8 +222,39 @@ export function useMultiplayerGame(roomCode: string | null) {
         setMyHand(data.myHand);
       }
       await refreshState();
+      return data;
     } catch (err: any) {
       alert(err.message);
+      return { error: err.message };
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const submitDrawDecision = async (action: 'play' | 'keep', chosenColor?: CardColor) => {
+    if (!room || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const res = await apiFetch('/api/game/draw-decision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId: room.id, action, chosenColor }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.requiresColorSelection) {
+          return { requiresColorSelection: true, cardId: data.cardId, side: data.side };
+        }
+        throw new Error(data.error || 'Draw decision failed');
+      }
+      if (data.myHand) {
+        setMyHand(data.myHand);
+      }
+      await refreshState();
+      return { success: true, action: data.action };
+    } catch (err: any) {
+      alert(err.message);
+      return { error: err.message };
     } finally {
       setIsSubmitting(false);
     }
@@ -354,6 +385,57 @@ export function useMultiplayerGame(roomCode: string | null) {
     }
   };
 
+  // Server-authoritative turn timeout & UNO timeout monitor
+  useEffect(() => {
+    if (!room?.id || room.status !== 'playing') return;
+
+    const roomId = room.id;
+    let turnTimeoutSent = false;
+    let unoTimeoutSent = false;
+
+    const interval = setInterval(async () => {
+      const now = Date.now();
+
+      // 1. Check turn deadline (30s default or decision deadline)
+      if (room.turn_deadline) {
+        const turnDeadlineMs = new Date(room.turn_deadline).getTime();
+        if (now >= turnDeadlineMs && !turnTimeoutSent) {
+          turnTimeoutSent = true;
+          try {
+            await apiFetch('/api/game/turn-timeout', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ roomId }),
+            });
+            await refreshState();
+          } catch {
+            // Handled on server
+          }
+        }
+      }
+
+      // 2. Check 5-second UNO declaration deadline
+      if (room.uno_declaration_deadline) {
+        const unoDeadlineMs = new Date(room.uno_declaration_deadline).getTime();
+        if (now >= unoDeadlineMs && !unoTimeoutSent) {
+          unoTimeoutSent = true;
+          try {
+            await apiFetch('/api/game/uno-timeout', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ roomId }),
+            });
+            await refreshState();
+          } catch {
+            // Handled on server
+          }
+        }
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [room?.id, room?.status, room?.turn_deadline, room?.uno_declaration_deadline, refreshState]);
+
   return {
     room,
     players,
@@ -365,6 +447,7 @@ export function useMultiplayerGame(roomCode: string | null) {
     isSubmitting,
     playCard,
     drawCard,
+    submitDrawDecision,
     callUno,
     challengeUno,
     toggleReady,

@@ -167,10 +167,7 @@ export interface PlayCardResult {
   actionLog: GameActionLog;
 }
 
-/**
- * Pure engine function to process playing a card from a player's hand.
- */
-export function processCardPlay(params: {
+export interface ProcessCardPlayParams {
   room: GameRoom;
   player: GamePlayer;
   players: GamePlayer[];
@@ -180,7 +177,15 @@ export function processCardPlay(params: {
   discardPile: UnoFlipCard[];
   calledUno: boolean;
   remainingHandLength?: number;
-}): PlayCardResult {
+  currentTime?: number;
+  turnDurationMs?: number;
+  unoDurationMs?: number;
+}
+
+/**
+ * Pure engine function to process playing a card from a player's hand.
+ */
+export function processCardPlay(params: ProcessCardPlayParams): PlayCardResult {
   const {
     room,
     player,
@@ -324,13 +329,25 @@ export function processCardPlay(params: {
     unoCalledBy.push(player.profile_id);
   }
 
-  // If player reaches exactly 1 card remaining without calling UNO, open catch window
+  const now = params.currentTime ?? Date.now();
+  const turnDurationMs = params.turnDurationMs ?? 30000;
+  const unoDurationMs = params.unoDurationMs ?? 5000;
+
+  // If player reaches exactly 1 card remaining without calling UNO, start 5s window
   let unoChallengeTarget: string | null = null;
+  let unoDeclarationDeadline: string | null = null;
+  let unoDeclarationPlayerId: string | null = null;
   if (params.remainingHandLength === 1) {
     if (!calledUno) {
       unoChallengeTarget = player.profile_id;
+      unoDeclarationPlayerId = player.profile_id;
+      unoDeclarationDeadline = new Date(now + unoDurationMs).toISOString();
     }
   }
+
+  const isGameOver = params.remainingHandLength === 0;
+  const turnStartedAt = new Date(now).toISOString();
+  const turnDeadline = new Date(now + turnDurationMs).toISOString();
 
   const logMessage = `${player.profile?.nickname || 'Player'} played ${
     activeFace.type === 'number'
@@ -349,7 +366,7 @@ export function processCardPlay(params: {
     chosenColor: nextActiveColor || undefined,
     drawnCount: penaltyCards.length,
     message: logMessage,
-    timestamp: Date.now(),
+    timestamp: now,
   };
 
   return {
@@ -361,7 +378,12 @@ export function processCardPlay(params: {
       top_card: card,
       draw_pile_count: newDrawPile.length,
       uno_called_by: unoCalledBy,
-      uno_challenge_target: unoChallengeTarget,
+      uno_challenge_target: isGameOver ? null : unoChallengeTarget,
+      turn_started_at: isGameOver ? null : turnStartedAt,
+      turn_deadline: isGameOver ? null : turnDeadline,
+      uno_declaration_deadline: isGameOver ? null : unoDeclarationDeadline,
+      uno_declaration_player_id: isGameOver ? null : unoDeclarationPlayerId,
+      pending_draw_decision: null,
       last_action: actionLog,
       pending_color_selection: false,
     },
@@ -466,5 +488,345 @@ export function processUnoChallenge(params: UnoChallengeParams): UnoChallengeRes
     updatedTargetHand,
     penaltyDrawnCards,
     actionLog,
+  };
+}
+
+export interface TurnTimeoutParams {
+  room: GameRoom;
+  players: GamePlayer[];
+  drawPile: UnoFlipCard[];
+  discardPile: UnoFlipCard[];
+  currentTime?: number;
+  turnDurationMs?: number;
+}
+
+export interface TurnTimeoutResult {
+  success: boolean;
+  error?: string;
+  updatedRoom?: Partial<GameRoom>;
+  updatedDrawPile?: UnoFlipCard[];
+  updatedDiscardPile?: UnoFlipCard[];
+  drawnCard?: UnoFlipCard;
+  penalizedPlayer?: GamePlayer;
+  actionLog?: GameActionLog;
+}
+
+/**
+ * Pure engine function to process turn expiration when a player fails to act within the 30-second window.
+ * If a draw decision was pending, the card is kept and the turn advances without drawing another card.
+ * Otherwise, exactly 1 card is drawn for the timed-out player and the turn advances to the next player.
+ */
+export function processTurnTimeout(params: TurnTimeoutParams): TurnTimeoutResult {
+  const { room, players, drawPile, discardPile } = params;
+  const now = params.currentTime ?? Date.now();
+  const turnDurationMs = params.turnDurationMs ?? 30000;
+
+  if (room.status !== 'playing') {
+    return { success: false, error: 'Game is not currently active' };
+  }
+
+  if (!room.turn_deadline) {
+    return { success: false, error: 'No turn deadline set' };
+  }
+
+  const deadlineMs = new Date(room.turn_deadline).getTime();
+  if (now < deadlineMs) {
+    return { success: false, error: 'Turn deadline has not expired yet' };
+  }
+
+  const currentPlayer = players.find((p) => p.seat_index === room.current_turn_seat);
+  if (!currentPlayer) {
+    return { success: false, error: 'Current player not found' };
+  }
+
+  // If a draw decision is pending, resolve it by keeping the card without drawing another card
+  if (room.pending_draw_decision && room.pending_draw_decision.player_id === currentPlayer.profile_id) {
+    const nextSeat = calculateNextSeat(currentPlayer.seat_index, players.length, room.direction, 1);
+    const actionLog: GameActionLog = {
+      type: 'pass',
+      playerId: currentPlayer.profile_id,
+      playerName: currentPlayer.profile?.nickname || 'Player',
+      message: `⏱️ ${currentPlayer.profile?.nickname || 'Player'} timed out on draw decision — kept the card.`,
+      timestamp: now,
+    };
+
+    return {
+      success: true,
+      updatedRoom: {
+        current_turn_seat: nextSeat,
+        pending_draw_decision: null,
+        turn_started_at: new Date(now).toISOString(),
+        turn_deadline: new Date(now + turnDurationMs).toISOString(),
+        uno_declaration_deadline: null,
+        uno_declaration_player_id: null,
+        last_action: actionLog,
+      },
+      actionLog,
+    };
+  }
+
+  // Otherwise draw exactly 1 penalty card and advance the turn
+  const drawResult = drawFromPile(drawPile, discardPile, 1);
+  const drawnCard = drawResult.drawn[0];
+  const nextSeat = calculateNextSeat(currentPlayer.seat_index, players.length, room.direction, 1);
+
+  const actionLog: GameActionLog = {
+    type: 'draw',
+    playerId: currentPlayer.profile_id,
+    playerName: currentPlayer.profile?.nickname || 'Player',
+    drawnCount: 1,
+    message: `⏱️ ${currentPlayer.profile?.nickname || 'Player'} ran out of time! +1 card penalty and turn passed.`,
+    timestamp: now,
+  };
+
+  return {
+    success: true,
+    updatedRoom: {
+      current_turn_seat: nextSeat,
+      draw_pile_count: drawResult.newDrawPile.length,
+      turn_started_at: new Date(now).toISOString(),
+      turn_deadline: new Date(now + turnDurationMs).toISOString(),
+      uno_declaration_deadline: null,
+      uno_declaration_player_id: null,
+      pending_draw_decision: null,
+      last_action: actionLog,
+    },
+    updatedDrawPile: drawResult.newDrawPile,
+    updatedDiscardPile: drawResult.newDiscardPile,
+    drawnCard,
+    penalizedPlayer: currentPlayer,
+    actionLog,
+  };
+}
+
+export interface UnoTimeoutParams {
+  room: GameRoom;
+  targetPlayer: GamePlayer;
+  targetHand: UnoFlipCard[];
+  drawPile: UnoFlipCard[];
+  discardPile: UnoFlipCard[];
+  currentTime?: number;
+}
+
+export interface UnoTimeoutResult {
+  success: boolean;
+  error?: string;
+  updatedRoom?: Partial<GameRoom>;
+  updatedDrawPile?: UnoFlipCard[];
+  updatedDiscardPile?: UnoFlipCard[];
+  updatedTargetHand?: UnoFlipCard[];
+  penaltyDrawnCards?: UnoFlipCard[];
+  actionLog?: GameActionLog;
+}
+
+/**
+ * Pure engine function to automatically apply the 2-card missed UNO penalty when the 5-second window expires.
+ */
+export function processUnoTimeout(params: UnoTimeoutParams): UnoTimeoutResult {
+  const { room, targetPlayer, targetHand, drawPile, discardPile } = params;
+  const now = params.currentTime ?? Date.now();
+
+  if (room.status !== 'playing') {
+    return { success: false, error: 'Game is not currently active' };
+  }
+
+  if (!room.uno_declaration_deadline) {
+    return { success: false, error: 'No active UNO declaration deadline' };
+  }
+
+  const deadlineMs = new Date(room.uno_declaration_deadline).getTime();
+  if (now < deadlineMs) {
+    return { success: false, error: 'UNO declaration window has not expired yet' };
+  }
+
+  if (room.uno_declaration_player_id && room.uno_declaration_player_id !== targetPlayer.profile_id) {
+    return { success: false, error: 'Target player does not match UNO declaration target' };
+  }
+
+  if (targetPlayer.card_count !== 1 || targetHand.length !== 1) {
+    return { success: false, error: 'Player does not have exactly 1 card remaining' };
+  }
+
+  if (targetPlayer.has_called_uno) {
+    return { success: false, error: 'Player already called UNO' };
+  }
+
+  // Draw exactly 2 penalty cards
+  const drawResult = drawFromPile(drawPile, discardPile, 2);
+  const penaltyDrawnCards = drawResult.drawn;
+  const updatedTargetHand = [...targetHand, ...penaltyDrawnCards];
+
+  const targetNickname = targetPlayer.profile?.nickname || 'Player';
+  const actionLog: GameActionLog = {
+    type: 'challenge_uno',
+    playerId: targetPlayer.profile_id,
+    playerName: targetNickname,
+    targetPlayerId: targetPlayer.profile_id,
+    targetPlayerName: targetNickname,
+    drawnCount: 2,
+    message: `🚨 UNO MISSED! ${targetNickname} failed to call UNO within 5s (+2 cards penalty)!`,
+    timestamp: now,
+  };
+
+  return {
+    success: true,
+    updatedRoom: {
+      uno_declaration_deadline: null,
+      uno_declaration_player_id: null,
+      uno_challenge_target: null,
+      draw_pile_count: drawResult.newDrawPile.length,
+      last_action: actionLog,
+    },
+    updatedDrawPile: drawResult.newDrawPile,
+    updatedDiscardPile: drawResult.newDiscardPile,
+    updatedTargetHand,
+    penaltyDrawnCards,
+    actionLog,
+  };
+}
+
+export interface ProcessDrawDecisionParams {
+  room: GameRoom;
+  player: GamePlayer;
+  players: GamePlayer[];
+  hand: UnoFlipCard[];
+  action: 'play' | 'keep';
+  chosenColor?: CardColor;
+  drawPile: UnoFlipCard[];
+  discardPile: UnoFlipCard[];
+  currentTime?: number;
+  turnDurationMs?: number;
+  unoDurationMs?: number;
+}
+
+export interface ProcessDrawDecisionResult {
+  success: boolean;
+  error?: string;
+  requiresColorSelection?: boolean;
+  cardId?: string;
+  side?: Side;
+  updatedRoom?: Partial<GameRoom>;
+  updatedDrawPile?: UnoFlipCard[];
+  updatedDiscardPile?: UnoFlipCard[];
+  updatedHand?: UnoFlipCard[];
+  isWinner?: boolean;
+  actionLog?: GameActionLog;
+  affectedPlayerId?: string;
+  penaltyDrawnCards?: UnoFlipCard[];
+}
+
+/**
+ * Pure engine function to process deciding whether to play or keep the drawn card.
+ */
+export function processDrawDecision(params: ProcessDrawDecisionParams): ProcessDrawDecisionResult {
+  const {
+    room,
+    player,
+    players,
+    hand,
+    action,
+    chosenColor,
+    drawPile,
+    discardPile,
+  } = params;
+  const now = params.currentTime ?? Date.now();
+  const turnDurationMs = params.turnDurationMs ?? 30000;
+
+  if (room.status !== 'playing') {
+    return { success: false, error: 'Game is not currently active' };
+  }
+
+  if (player.seat_index !== room.current_turn_seat) {
+    return { success: false, error: 'Not your turn' };
+  }
+
+  if (!room.pending_draw_decision || room.pending_draw_decision.player_id !== player.profile_id) {
+    return { success: false, error: 'No pending draw decision for this player' };
+  }
+
+  if (action === 'keep') {
+    const nextSeat = calculateNextSeat(player.seat_index, players.length, room.direction, 1);
+    const actionLog: GameActionLog = {
+      type: 'pass',
+      playerId: player.profile_id,
+      playerName: player.profile?.nickname || 'Player',
+      message: `${player.profile?.nickname || 'Player'} kept the drawn card.`,
+      timestamp: now,
+    };
+
+    return {
+      success: true,
+      updatedRoom: {
+        current_turn_seat: nextSeat,
+        pending_draw_decision: null,
+        turn_started_at: new Date(now).toISOString(),
+        turn_deadline: new Date(now + turnDurationMs).toISOString(),
+        uno_declaration_deadline: null,
+        uno_declaration_player_id: null,
+        last_action: actionLog,
+      },
+      updatedHand: hand,
+      actionLog,
+    };
+  }
+
+  // action === 'play'
+  const drawnCardId = room.pending_draw_decision.card_id;
+  const cardToPlay = hand.find((c) => c.id === drawnCardId);
+  if (!cardToPlay) {
+    return { success: false, error: 'Drawn card not found in your hand' };
+  }
+
+  // Validate legality
+  const valid = isValidPlay(cardToPlay, room.top_card, room.current_side, room.active_color);
+  if (!valid) {
+    return { success: false, error: 'Drawn card cannot be legally played' };
+  }
+
+  const activeFace = room.current_side === 'light' ? cardToPlay.light : cardToPlay.dark;
+  if (activeFace.color === 'wild' && !chosenColor) {
+    return {
+      success: false,
+      requiresColorSelection: true,
+      cardId: cardToPlay.id,
+      side: room.current_side,
+    };
+  }
+
+  const remainingHand = hand.filter((c) => c.id !== cardToPlay.id);
+  const playResult = processCardPlay({
+    room,
+    player,
+    players,
+    card: cardToPlay,
+    chosenColor,
+    drawPile,
+    discardPile,
+    calledUno: false, // If now 1 card left, 5s window will start
+    remainingHandLength: remainingHand.length,
+    currentTime: now,
+    turnDurationMs,
+    unoDurationMs: params.unoDurationMs ?? 5000,
+  });
+
+  const isWinner = remainingHand.length === 0;
+  if (isWinner && playResult.updatedRoom) {
+    playResult.updatedRoom.status = 'finished';
+    playResult.updatedRoom.winner_id = player.profile_id;
+  }
+
+  return {
+    success: true,
+    updatedRoom: {
+      ...playResult.updatedRoom,
+      pending_draw_decision: null,
+    },
+    updatedDrawPile: playResult.updatedDrawPile,
+    updatedDiscardPile: playResult.updatedDiscardPile,
+    updatedHand: remainingHand,
+    isWinner,
+    actionLog: playResult.actionLog,
+    affectedPlayerId: playResult.affectedPlayerId,
+    penaltyDrawnCards: playResult.penaltyDrawnCards,
   };
 }
