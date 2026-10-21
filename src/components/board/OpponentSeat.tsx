@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { GamePlayer, Side } from '@/lib/game/types';
 import { Crown, Flame, ShieldAlert } from 'lucide-react';
 
@@ -10,6 +10,7 @@ interface OpponentSeatProps {
   activeSide: Side;
   isVulnerable?: boolean;
   isPenalized?: boolean;
+  penaltyLabel?: string;
   onChallengeUno?: (playerId: string) => void;
   position: 'top' | 'left' | 'right';
 }
@@ -19,15 +20,31 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
   isCurrentTurn,
   isVulnerable = false,
   isPenalized = false,
+  penaltyLabel = '+2 CARDS PENALTY',
   onChallengeUno,
 }) => {
+  const [showPenalty, setShowPenalty] = useState(false);
+
+  // Auto-dismiss penalty effect so it only shows for a brief duration (2.5 seconds)
+  useEffect(() => {
+    if (isPenalized) {
+      setShowPenalty(true);
+      const timer = setTimeout(() => {
+        setShowPenalty(false);
+      }, 2500);
+      return () => clearTimeout(timer);
+    } else {
+      setShowPenalty(false);
+    }
+  }, [isPenalized]);
+
   const nickname = player.profile?.nickname || `Player ${player.seat_index + 1}`;
   const initial = nickname.charAt(0).toUpperCase();
   const avatarBg = player.profile?.avatar_color || '#1677E8';
   const cardCount = player.card_count;
 
   // Can this player be challenged for not calling UNO?
-  const canChallenge = isVulnerable && cardCount === 1 && !player.has_called_uno && !isPenalized;
+  const canChallenge = isVulnerable && cardCount === 1 && !player.has_called_uno && !showPenalty;
 
   return (
     <div
@@ -35,16 +52,16 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
       className="relative flex flex-col items-center select-none transition-transform"
     >
       {/* Floating Penalty Announcement Tag */}
-      {isPenalized && (
+      {showPenalty && (
         <div className="absolute -top-7 z-30 px-2 py-0.5 rounded bg-[#ED1C24] text-white text-[10px] font-black tracking-wider uppercase shadow-md animate-bounce whitespace-nowrap">
-          +2 CARDS PENALTY
+          {penaltyLabel}
         </div>
       )}
 
       {/* Player Card Container */}
       <div
         className={`flex flex-col items-center p-2.5 rounded-lg border transition-all ${
-          isPenalized
+          showPenalty
             ? 'bg-[#1E232B] border-[#ED1C24] ring-2 ring-[#ED1C24]/60'
             : isCurrentTurn
             ? 'bg-[#1E232B] border-[#FFCC00]'
@@ -55,7 +72,7 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
         <div className="relative">
           <div
             className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-bold text-sm sm:text-base text-white border transition-all ${
-              isPenalized
+              showPenalty
                 ? 'border-[#ED1C24] ring-2 ring-[#ED1C24]'
                 : 'border-white/20'
             }`}
@@ -84,7 +101,7 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
           <div className="flex items-center gap-1 text-[10px]">
             <span
               className={`transition-all ${
-                isPenalized ? 'text-[#ED1C24] font-bold' : 'text-[#9BA3AF]'
+                showPenalty ? 'text-[#ED1C24] font-bold' : 'text-[#9BA3AF]'
               }`}
             >
               {cardCount} {cardCount === 1 ? 'card' : 'cards'}

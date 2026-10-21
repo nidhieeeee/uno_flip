@@ -574,6 +574,8 @@ export function processTurnTimeout(params: TurnTimeoutParams): TurnTimeoutResult
     type: 'draw',
     playerId: currentPlayer.profile_id,
     playerName: currentPlayer.profile?.nickname || 'Player',
+    targetPlayerId: currentPlayer.profile_id,
+    targetPlayerName: currentPlayer.profile?.nickname || 'Player',
     drawnCount: 1,
     message: `⏱️ ${currentPlayer.profile?.nickname || 'Player'} ran out of time! +1 card penalty and turn passed.`,
     timestamp: now,

@@ -64,6 +64,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     message: string;
     isTargetMe: boolean;
   } | null>(null);
+  const [actionBanner, setActionBanner] = useState<string | null>(null);
   const [soundMuted, setSoundMutedState] = useState(isSoundMuted());
   const [turnSecondsLeft, setTurnSecondsLeft] = useState<number | null>(null);
 
@@ -88,7 +89,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   const boardRef = useRef<HTMLDivElement>(null);
   const prevSideRef = useRef<Side>(room.current_side);
-  const lastHandledChallengeTimestamp = useRef<number>(0);
+  const lastHandledActionTimestamp = useRef<number>(0);
+  const penaltyTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const actionBannerTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (penaltyTimerRef.current) clearTimeout(penaltyTimerRef.current);
+      if (actionBannerTimerRef.current) clearTimeout(actionBannerTimerRef.current);
+    };
+  }, []);
 
   const isLight = room.current_side === 'light';
   const isMyTurn = me !== null && room.current_turn_seat === me.seat_index;
@@ -119,28 +130,33 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
   }, [room.current_side]);
 
-  // Handle Penalty Action Animation & Sound
+  // Handle Penalty Action Animation, Sound, and Temporary Action Banners
   useEffect(() => {
     if (!room.last_action) return;
-    if (
-      room.last_action.type === 'challenge_uno' &&
-      room.last_action.timestamp !== lastHandledChallengeTimestamp.current
-    ) {
-      lastHandledChallengeTimestamp.current = room.last_action.timestamp;
-      const targetId = room.last_action.targetPlayerId;
+    const action = room.last_action;
+    if (action.timestamp === lastHandledActionTimestamp.current) return;
+    lastHandledActionTimestamp.current = action.timestamp;
+
+    const isPenalty =
+      action.type === 'challenge_uno' ||
+      (typeof action.message === 'string' &&
+        action.message.toLowerCase().includes('penalty'));
+
+    if (isPenalty) {
+      const targetId = action.targetPlayerId || action.playerId;
       if (!targetId) return;
 
       const isTargetMe = targetId === me?.profile_id;
+      setPenalizedPlayerId(targetId);
 
-      const animFrame = requestAnimationFrame(() => {
-        setPenalizedPlayerId(targetId);
+      let bannerMsg = action.message || 'Penalty applied!';
+      if (action.type === 'challenge_uno' && isTargetMe) {
+        bannerMsg = 'CAUGHT! You forgot to call UNO! (+2 cards penalty)';
+      }
 
-        setPenaltyAnnouncement({
-          message: isTargetMe
-            ? 'CAUGHT! You forgot to call UNO! (+2 cards penalty)'
-            : room.last_action?.message || 'Player caught forgetting UNO!',
-          isTargetMe,
-        });
+      setPenaltyAnnouncement({
+        message: bannerMsg,
+        isTargetMe,
       });
 
       // Play penalty sound
@@ -164,8 +180,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             { x: 0, duration: 0.45, ease: 'elastic.out(1, 0.3)' }
           );
 
-          // Fly 2 penalty cards from draw pile to target
-          for (let i = 0; i < 2; i++) {
+          // Fly penalty cards from draw pile to target
+          const cardCountToFly = Math.min(action.drawnCount || 2, 3);
+          for (let i = 0; i < cardCountToFly; i++) {
             const flyCard = document.createElement('div');
             flyCard.className =
               'fixed z-50 pointer-events-none w-12 h-16 sm:w-16 sm:h-24 rounded-lg bg-[#ED1C24] border-2 border-white shadow-2xl flex items-center justify-center font-black text-sm text-white select-none';
@@ -191,23 +208,34 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         }
       }
 
-      const timer = setTimeout(() => {
+      // Automatically dismiss penalty effect after 2.5 seconds
+      if (penaltyTimerRef.current) {
+        clearTimeout(penaltyTimerRef.current);
+      }
+      penaltyTimerRef.current = setTimeout(() => {
         setPenalizedPlayerId(null);
         setPenaltyAnnouncement(null);
-      }, 3500);
-
-      return () => {
-        cancelAnimationFrame(animFrame);
-        clearTimeout(timer);
-      };
+        penaltyTimerRef.current = null;
+      }, 2500);
+    } else if (action.message) {
+      // Normal game action banner (play, pass, flip) — auto-dismiss after 3s
+      setActionBanner(action.message);
+      if (actionBannerTimerRef.current) {
+        clearTimeout(actionBannerTimerRef.current);
+      }
+      actionBannerTimerRef.current = setTimeout(() => {
+        setActionBanner(null);
+        actionBannerTimerRef.current = null;
+      }, 3000);
     }
-  }, [room.last_action, me?.profile_id]);
-
-  // Display recent action banner (normal non-challenge events)
-  const actionBanner =
-    room.last_action && room.last_action.type !== 'challenge_uno'
-      ? room.last_action.message
-      : null;
+  }, [
+    room.last_action?.timestamp,
+    room.last_action?.type,
+    room.last_action?.message,
+    room.last_action?.targetPlayerId,
+    room.last_action?.playerId,
+    me?.profile_id,
+  ]);
 
   // Handle card click
   const handleCardClick = async (card: UnoFlipCard) => {
@@ -353,6 +381,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               activeSide={room.current_side}
               isVulnerable={room.uno_challenge_target === opponent.profile_id}
               isPenalized={penalizedPlayerId === opponent.profile_id}
+              penaltyLabel={
+                penalizedPlayerId === opponent.profile_id && penaltyAnnouncement
+                  ? penaltyAnnouncement.message.includes('+1')
+                    ? '+1 CARD PENALTY'
+                    : '+2 CARDS PENALTY'
+                  : '+2 CARDS PENALTY'
+              }
               onChallengeUno={onChallengeUno}
               position={idx === 1 ? 'top' : idx === 0 ? 'left' : 'right'}
             />
@@ -444,6 +479,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               : null
           }
           isPenalized={penalizedPlayerId === me?.profile_id}
+          penaltyMessage={
+            penalizedPlayerId === me?.profile_id && penaltyAnnouncement?.isTargetMe
+              ? penaltyAnnouncement.message
+              : null
+          }
         />
       </footer>
 

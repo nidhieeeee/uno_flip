@@ -16,6 +16,7 @@ interface PlayerHandProps {
   hasCalledUno: boolean;
   unoDeclarationDeadline?: string | null;
   isPenalized?: boolean;
+  penaltyMessage?: string | null;
   disabled?: boolean;
 }
 
@@ -29,12 +30,27 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
   hasCalledUno,
   unoDeclarationDeadline,
   isPenalized = false,
+  penaltyMessage,
   disabled = false,
 }) => {
   const [peekOtherSide, setPeekOtherSide] = useState(false);
   const [isCallingUno, setIsCallingUno] = useState(false);
   const [justCalledUno, setJustCalledUno] = useState(false);
   const [unoSecondsLeft, setUnoSecondsLeft] = useState<number | null>(null);
+  const [showPenalty, setShowPenalty] = useState(false);
+
+  // Auto-dismiss penalty effect so it only shows for a brief duration (2.5 seconds)
+  useEffect(() => {
+    if (isPenalized) {
+      setShowPenalty(true);
+      const timer = setTimeout(() => {
+        setShowPenalty(false);
+      }, 2500);
+      return () => clearTimeout(timer);
+    } else {
+      setShowPenalty(false);
+    }
+  }, [isPenalized]);
 
   useEffect(() => {
     if (!unoDeclarationDeadline) {
@@ -80,19 +96,19 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
     <div
       id="player-hand-container"
       className={`relative w-full flex flex-col items-center select-none transition-all duration-200 ${
-        isPenalized ? 'p-2 rounded-xl border border-[#ED1C24] bg-[#ED1C24]/10' : ''
+        showPenalty ? 'p-2 rounded-xl border border-[#ED1C24] bg-[#ED1C24]/10' : ''
       }`}
     >
       {/* Floating Penalty Notification Badge */}
-      {isPenalized && (
+      {showPenalty && (
         <div className="absolute -top-7 z-30 px-3 py-1 rounded-full bg-[#ED1C24] text-white text-xs font-black tracking-wider uppercase shadow-lg animate-bounce flex items-center gap-1.5">
           <ShieldAlert className="w-3.5 h-3.5" />
-          <span>+2 CARDS PENALTY — You forgot to call UNO!</span>
+          <span>{penaltyMessage || '+2 CARDS PENALTY — You forgot to call UNO!'}</span>
         </div>
       )}
 
       {/* Floating 5-Second UNO Declaration Countdown Banner */}
-      {!isPenalized && isUnoVulnerable && unoSecondsLeft !== null && unoSecondsLeft > 0 && (
+      {!showPenalty && isUnoVulnerable && unoSecondsLeft !== null && unoSecondsLeft > 0 && (
         <div className="mb-2 px-3.5 py-1 rounded-full bg-[#ED1C24] text-white text-xs font-black tracking-wider uppercase shadow-lg animate-pulse flex items-center gap-1.5">
           <Flame className="w-3.5 h-3.5 fill-current text-[#FFCC00]" />
           <span>CALL UNO NOW! {unoSecondsLeft}s remaining or +2 cards penalty!</span>
