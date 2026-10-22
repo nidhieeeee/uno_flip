@@ -116,19 +116,29 @@ export async function POST(req: Request) {
 
     const activeFace = room.current_side === 'light' ? cardToPlay.light : cardToPlay.dark;
 
-    // 5. If Wild card and color not selected yet, prompt color selection
+    // 5. Validate move against top card, active color, and active penalty stack
+    const valid = isValidPlay(
+      cardToPlay,
+      room.top_card,
+      room.current_side,
+      room.active_color,
+      room.draw_penalty || 0
+    );
+    if (!valid) {
+      return NextResponse.json({
+        error: (room.draw_penalty || 0) > 0
+          ? 'Invalid move: You must stack an equal or higher penalty card, or draw cards!'
+          : 'Invalid card play for current top card and color',
+      }, { status: 400 });
+    }
+
+    // 6. If Wild card and color not selected yet, prompt color selection
     if (activeFace.color === 'wild' && !chosenColor) {
       return NextResponse.json({
         requiresColorSelection: true,
         cardId: cardToPlay.id,
         side: room.current_side,
       });
-    }
-
-    // 6. Validate move against top card and active color
-    const valid = isValidPlay(cardToPlay, room.top_card, room.current_side, room.active_color);
-    if (!valid) {
-      return NextResponse.json({ error: 'Invalid card play for current top card and color' }, { status: 400 });
     }
 
     // 7. Fetch Private Deck

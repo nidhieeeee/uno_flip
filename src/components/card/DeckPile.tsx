@@ -10,6 +10,7 @@ interface DeckPileProps {
   isMyTurn: boolean;
   onDraw: () => void;
   disabled?: boolean;
+  drawPenalty?: number;
 }
 
 export const DeckPile: React.FC<DeckPileProps> = ({
@@ -18,15 +19,17 @@ export const DeckPile: React.FC<DeckPileProps> = ({
   isMyTurn,
   onDraw,
   disabled = false,
+  drawPenalty = 0,
 }) => {
   const isLight = activeSide === 'light';
+  const hasPenalty = drawPenalty > 0;
 
   return (
     <div id="deck-pile-container" className="flex flex-col items-center select-none">
       {/* Deck Stack */}
       <div
         className={`relative cursor-pointer transition-transform duration-150 ${
-          isMyTurn && !disabled ? 'hover:-translate-y-1 active:translate-y-0' : 'cursor-default'
+          isMyTurn && !disabled ? 'active:scale-95' : 'cursor-default'
         }`}
         onClick={isMyTurn && !disabled ? onDraw : undefined}
       >
@@ -38,7 +41,9 @@ export const DeckPile: React.FC<DeckPileProps> = ({
         <div
           className={`relative w-20 h-28 sm:w-24 sm:h-36 rounded-lg p-1.5 border transition-all ${
             isMyTurn && !disabled
-              ? 'ring-2 ring-[#FFCC00] border-[#FFCC00]'
+              ? hasPenalty
+                ? 'ring-2 ring-[#ED1C24] border-[#ED1C24] animate-pulse'
+                : 'ring-2 ring-[#FFCC00] border-[#FFCC00]'
               : 'border-[#2D333B]'
           } ${isLight ? 'bg-black text-white' : 'bg-[#ED1C24] text-white'}`}
         >
@@ -61,13 +66,19 @@ export const DeckPile: React.FC<DeckPileProps> = ({
 
       {/* Card Count & Action */}
       <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#1E232B] border border-[#2D333B] text-[#9BA3AF] text-xs font-medium">
-        <Layers className="w-3.5 h-3.5 text-[#FFCC00]" />
+        <Layers className={`w-3.5 h-3.5 ${hasPenalty ? 'text-[#ED1C24]' : 'text-[#FFCC00]'}`} />
         <span>{count} cards</span>
       </div>
 
       {isMyTurn && !disabled && (
-        <span className="mt-1 text-[11px] font-bold text-[#FFCC00] uppercase tracking-wider">
-          Click to Draw
+        <span
+          className={`mt-1 text-[11px] uppercase tracking-wider ${
+            hasPenalty
+              ? 'font-black text-[#ED1C24] animate-pulse'
+              : 'font-bold text-[#FFCC00]'
+          }`}
+        >
+          {hasPenalty ? `Draw +${drawPenalty} Penalty` : 'Click to Draw'}
         </span>
       )}
     </div>

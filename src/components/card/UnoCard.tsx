@@ -212,19 +212,17 @@ export const UnoCard: React.FC<UnoCardProps> = ({
   return (
     <div
       onClick={isPlayable && onClick ? onClick : undefined}
-      className={`relative select-none transition-colors duration-150 ${sizeStyles} ${
-        isPlayable
+      className={`relative select-none transition-colors duration-150 ${sizeStyles} ${isPlayable
           ? 'cursor-pointer ring-2 ring-[#FFCC00]'
           : 'cursor-default opacity-95'
-      } ${className}`}
+        } ${className}`}
     >
       {/* Outer Card Frame: Classic White Border on Light, Dark Border on Dark */}
       <div
-        className={`w-full h-full rounded-[inherit] p-1.5 flex flex-col justify-between border ${
-          isLight
+        className={`w-full h-full rounded-[inherit] p-1.5 flex flex-col justify-between border ${isLight
             ? 'bg-white border-slate-300 shadow-sm'
             : 'bg-[#111418] border-[#2D333B] shadow-sm'
-        }`}
+          }`}
       >
         {/* Inner Solid Card Body */}
         <div
@@ -240,13 +238,12 @@ export const UnoCard: React.FC<UnoCardProps> = ({
           {/* Classic Center Oval */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div
-              className={`w-4/5 h-3/5 rounded-[50%] transform -rotate-[25deg] flex items-center justify-center border ${
-                face.color === 'wild'
+              className={`w-4/5 h-3/5 rounded-[50%] transform -rotate-[25deg] flex items-center justify-center border ${face.color === 'wild'
                   ? 'bg-transparent border-transparent'
                   : isLight
-                  ? 'bg-white border-slate-200'
-                  : 'bg-white border-slate-300'
-              }`}
+                    ? 'bg-white border-slate-200'
+                    : 'bg-white border-slate-300'
+                }`}
             >
               <div className="transform rotate-[25deg] flex items-center justify-center">
                 {renderSymbol()}

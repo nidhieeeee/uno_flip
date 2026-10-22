@@ -79,8 +79,11 @@ export async function POST(req: Request) {
     const drawPile: UnoFlipCard[] = deckData.draw_pile || [];
     const discardPile: UnoFlipCard[] = deckData.discard_pile || [];
 
-    // 4. Draw 1 card
-    const { drawn, newDrawPile, newDiscardPile } = drawFromPile(drawPile, discardPile, 1);
+    // 4. Determine cards to draw (full penalty stack if active, otherwise 1)
+    const isPenaltyStack = (room.draw_penalty || 0) > 0;
+    const cardsToDraw = isPenaltyStack ? room.draw_penalty : 1;
+
+    const { drawn, newDrawPile, newDiscardPile } = drawFromPile(drawPile, discardPile, cardsToDraw);
 
     if (drawn.length === 0) {
       return NextResponse.json({ error: 'No cards left in the deck to draw' }, { status: 400 });
@@ -97,7 +100,7 @@ export async function POST(req: Request) {
       .single();
 
     const currentHand: UnoFlipCard[] = (handData?.cards as UnoFlipCard[]) || [];
-    const updatedHand = [...currentHand, drawnCard];
+    const updatedHand = [...currentHand, ...drawn];
 
     await supabase
       .from('game_player_hands')
@@ -117,9 +120,67 @@ export async function POST(req: Request) {
       ? room.uno_called_by.filter((id) => id !== profile.id)
       : [];
 
-    // 6. Check whether newly drawn card is legally playable
-    const isPlayable = isValidPlay(drawnCard, room.top_card, room.current_side, room.active_color);
     const now = new Date();
+
+    // 6. If drawing accumulated penalty, player forfeits turn and no play decision is offered
+    if (isPenaltyStack) {
+      const nextSeat = calculateNextSeat(currentPlayer.seat_index, players.length, room.direction, 1);
+      const turnDeadline = new Date(now.getTime() + 30000).toISOString();
+
+      const actionLog: GameActionLog = {
+        type: 'draw',
+        playerId: profile.id,
+        playerName: profile.nickname,
+        drawnCount: drawn.length,
+        message: `${profile.nickname} drew +${drawn.length} accumulated penalty cards! Turn passed.`,
+        timestamp: now.getTime(),
+      };
+
+      await supabase
+        .from('game_rooms')
+        .update({
+          current_turn_seat: nextSeat,
+          draw_pile_count: newDrawPile.length,
+          draw_penalty: 0,
+          uno_challenge_target: null,
+          uno_called_by: updatedUnoCalledBy,
+          pending_draw_decision: null,
+          turn_started_at: now.toISOString(),
+          turn_deadline: turnDeadline,
+          last_action: actionLog,
+          updated_at: now.toISOString(),
+        })
+        .eq('id', roomId);
+
+      await supabase
+        .from('game_decks_private')
+        .update({
+          draw_pile: newDrawPile,
+          discard_pile: newDiscardPile,
+          updated_at: now.toISOString(),
+        })
+        .eq('room_id', roomId);
+
+      await supabase.from('game_moves').insert({
+        room_id: roomId,
+        player_id: profile.id,
+        action_type: 'draw',
+        details: actionLog,
+      });
+
+      return NextResponse.json({
+        success: true,
+        drawnCards: drawn,
+        drawnCard,
+        myHand: updatedHand,
+        isPlayable: false,
+        requiresDecision: false,
+        drawPenaltyPaid: drawn.length,
+      });
+    }
+
+    // 7. Regular draw (when no penalty stack): check whether newly drawn card is legally playable
+    const isPlayable = isValidPlay(drawnCard, room.top_card, room.current_side, room.active_color, 0);
 
     if (isPlayable) {
       // 7A. Playable: Give player opportunity to decide (Play or Keep) with 15s deadline
@@ -147,7 +208,7 @@ export async function POST(req: Request) {
           uno_challenge_target: null,
           uno_called_by: updatedUnoCalledBy,
           pending_draw_decision: pendingDecision,
-          turn_deadline: decisionDeadline, // Extend turn timer to decision deadline
+          turn_deadline: null, // Normal turn timer is suspended during draw decision
           last_action: actionLog,
           updated_at: now.toISOString(),
         })

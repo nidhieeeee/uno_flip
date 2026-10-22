@@ -95,13 +95,14 @@ export function useMultiplayerGame(roomCode: string | null) {
   }, [roomCode]);
 
   const roomRef = useRef(room);
-  roomRef.current = room;
-
   const currentProfileRef = useRef(currentProfile);
-  currentProfileRef.current = currentProfile;
-
   const refreshStateRef = useRef(refreshState);
-  refreshStateRef.current = refreshState;
+
+  useEffect(() => {
+    roomRef.current = room;
+    currentProfileRef.current = currentProfile;
+    refreshStateRef.current = refreshState;
+  });
 
   const leaveTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
@@ -187,7 +188,7 @@ export function useMultiplayerGame(roomCode: string | null) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ roomId, profileId: leftProfileId }),
-          }).catch(() => {});
+          }).catch(() => { });
         }
         leaveTimersRef.current.delete(leftProfileId);
       }, 6000);
@@ -232,10 +233,11 @@ export function useMultiplayerGame(roomCode: string | null) {
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 
+    const timers = leaveTimersRef.current;
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      leaveTimersRef.current.forEach((t) => clearTimeout(t));
-      leaveTimersRef.current.clear();
+      timers.forEach((t) => clearTimeout(t));
+      timers.clear();
       supabase.removeChannel(channel);
     };
   }, [room?.id, currentProfile?.id]);
@@ -329,6 +331,18 @@ export function useMultiplayerGame(roomCode: string | null) {
       if (data.myHand) {
         setMyHand(data.myHand);
       }
+      if (data.pendingDecision) {
+        // Immediately pause normal turn timer and activate draw decision popup
+        setRoom((prev) =>
+          prev
+            ? {
+                ...prev,
+                pending_draw_decision: data.pendingDecision,
+                turn_deadline: null,
+              }
+            : prev
+        );
+      }
       await refreshState();
       return data;
     } catch (err: any) {
@@ -358,10 +372,20 @@ export function useMultiplayerGame(roomCode: string | null) {
       if (data.myHand) {
         setMyHand(data.myHand);
       }
+      // Optimistically clear the pending decision modal
+      setRoom((prev) =>
+        prev
+          ? {
+              ...prev,
+              pending_draw_decision: null,
+            }
+          : prev
+      );
       await refreshState();
       return { success: true, action: data.action };
     } catch (err: any) {
       alert(err.message);
+      await refreshState();
       return { error: err.message };
     } finally {
       setIsSubmitting(false);
@@ -504,7 +528,31 @@ export function useMultiplayerGame(roomCode: string | null) {
     const interval = setInterval(async () => {
       const now = Date.now();
 
-      // 1. Check turn deadline (30s default or decision deadline)
+      // 1. If a draw decision is pending:
+      // Turn timer is SUSPENDED. Monitor ONLY the decision deadline!
+      if (room.pending_draw_decision) {
+        const decisionDeadline = room.pending_draw_decision.decision_deadline;
+        if (decisionDeadline) {
+          const decisionDeadlineMs = new Date(decisionDeadline).getTime();
+          if (now >= decisionDeadlineMs && !turnTimeoutSent) {
+            turnTimeoutSent = true;
+            try {
+              await apiFetch('/api/game/turn-timeout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roomId }),
+              });
+              await refreshState();
+            } catch {
+              // Handled on server
+            }
+          }
+        }
+        // Do NOT check normal turn_deadline while draw decision is pending!
+        return;
+      }
+
+      // 2. Normal turn deadline (30s)
       if (room.turn_deadline) {
         const turnDeadlineMs = new Date(room.turn_deadline).getTime();
         if (now >= turnDeadlineMs && !turnTimeoutSent) {
@@ -522,7 +570,7 @@ export function useMultiplayerGame(roomCode: string | null) {
         }
       }
 
-      // 2. Check 5-second UNO declaration deadline
+      // 3. Check 5-second UNO declaration deadline
       if (room.uno_declaration_deadline) {
         const unoDeadlineMs = new Date(room.uno_declaration_deadline).getTime();
         if (now >= unoDeadlineMs && !unoTimeoutSent) {
@@ -542,7 +590,14 @@ export function useMultiplayerGame(roomCode: string | null) {
     }, 500);
 
     return () => clearInterval(interval);
-  }, [room?.id, room?.status, room?.turn_deadline, room?.uno_declaration_deadline, refreshState]);
+  }, [
+    room?.id,
+    room?.status,
+    room?.turn_deadline,
+    room?.pending_draw_decision,
+    room?.uno_declaration_deadline,
+    refreshState,
+  ]);
 
   return {
     room,

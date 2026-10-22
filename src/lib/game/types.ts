@@ -7,6 +7,7 @@ export type CardColor = LightColor | DarkColor;
 export type LightCardType =
   | 'number'
   | 'draw_one'
+  | 'draw_two'
   | 'reverse'
   | 'skip'
   | 'flip'
@@ -15,6 +16,7 @@ export type LightCardType =
 
 export type DarkCardType =
   | 'number'
+  | 'draw_two'
   | 'draw_five'
   | 'reverse'
   | 'skip_everyone'

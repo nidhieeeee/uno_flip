@@ -23,20 +23,22 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
   penaltyLabel = '+2 CARDS PENALTY',
   onChallengeUno,
 }) => {
-  const [showPenalty, setShowPenalty] = useState(false);
+  const [showPenalty, setShowPenalty] = useState(isPenalized);
+  const [prevIsPenalized, setPrevIsPenalized] = useState(isPenalized);
+
+  if (isPenalized !== prevIsPenalized) {
+    setPrevIsPenalized(isPenalized);
+    setShowPenalty(isPenalized);
+  }
 
   // Auto-dismiss penalty effect so it only shows for a brief duration (2.5 seconds)
   useEffect(() => {
-    if (isPenalized) {
-      setShowPenalty(true);
-      const timer = setTimeout(() => {
-        setShowPenalty(false);
-      }, 2500);
-      return () => clearTimeout(timer);
-    } else {
+    if (!showPenalty) return;
+    const timer = setTimeout(() => {
       setShowPenalty(false);
-    }
-  }, [isPenalized]);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [showPenalty]);
 
   const nickname = player.profile?.nickname || `Player ${player.seat_index + 1}`;
   const initial = nickname.charAt(0).toUpperCase();
@@ -51,9 +53,8 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
   return (
     <div
       id={`opponent-seat-${player.profile_id}`}
-      className={`relative flex flex-col items-center select-none transition-transform ${
-        isDisconnected ? 'opacity-70' : ''
-      }`}
+      className={`relative flex flex-col items-center select-none transition-transform ${isDisconnected ? 'opacity-70' : ''
+        }`}
     >
       {/* Floating Penalty Announcement Tag */}
       {showPenalty && (
@@ -72,26 +73,24 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
 
       {/* Player Card Container */}
       <div
-        className={`flex flex-col items-center p-2.5 rounded-lg border transition-all ${
-          showPenalty
+        className={`flex flex-col items-center p-2.5 rounded-lg border transition-all ${showPenalty
             ? 'bg-[#1E232B] border-[#ED1C24] ring-2 ring-[#ED1C24]/60'
             : isDisconnected
-            ? 'bg-[#1E232B] border-dashed border-[#ED1C24]/60'
-            : isCurrentTurn
-            ? 'bg-[#1E232B] border-[#FFCC00]'
-            : 'bg-[#15191F] border-[#2D333B]'
-        }`}
+              ? 'bg-[#1E232B] border-dashed border-[#ED1C24]/60'
+              : isCurrentTurn
+                ? 'bg-[#1E232B] border-[#FFCC00]'
+                : 'bg-[#15191F] border-[#2D333B]'
+          }`}
       >
         {/* Avatar with initial */}
         <div className="relative">
           <div
-            className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-bold text-sm sm:text-base text-white border transition-all ${
-              showPenalty
+            className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-bold text-sm sm:text-base text-white border transition-all ${showPenalty
                 ? 'border-[#ED1C24] ring-2 ring-[#ED1C24]'
                 : isDisconnected
-                ? 'border-[#ED1C24]/60'
-                : 'border-white/20'
-            }`}
+                  ? 'border-[#ED1C24]/60'
+                  : 'border-white/20'
+              }`}
             style={{ backgroundColor: avatarBg }}
           >
             {initial}
@@ -122,9 +121,8 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
               </span>
             ) : (
               <span
-                className={`transition-all ${
-                  showPenalty ? 'text-[#ED1C24] font-bold' : 'text-[#9BA3AF]'
-                }`}
+                className={`transition-all ${showPenalty ? 'text-[#ED1C24] font-bold' : 'text-[#9BA3AF]'
+                  }`}
               >
                 {cardCount} {cardCount === 1 ? 'card' : 'cards'}
               </span>

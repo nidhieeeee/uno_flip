@@ -31,19 +31,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, message: 'Game is not playing' });
     }
 
-    if (!room.turn_deadline) {
-      return NextResponse.json({ success: true, message: 'No turn deadline active' });
-    }
-
-    // Verify turn deadline has strictly expired
     const now = Date.now();
-    const deadlineMs = new Date(room.turn_deadline).getTime();
-    if (now < deadlineMs) {
-      return NextResponse.json({
-        success: false,
-        error: 'Turn deadline has not expired yet',
-        remainingMs: deadlineMs - now,
-      }, { status: 400 });
+
+    // 1. If a draw decision is pending, check the decision deadline specifically
+    if (room.pending_draw_decision) {
+      const decisionDeadline = room.pending_draw_decision.decision_deadline;
+      if (!decisionDeadline) {
+        return NextResponse.json({ success: true, message: 'Draw decision is pending without deadline; turn timer suspended' });
+      }
+      const decisionDeadlineMs = new Date(decisionDeadline).getTime();
+      if (now < decisionDeadlineMs) {
+        return NextResponse.json({
+          success: false,
+          error: 'Draw decision deadline has not expired yet',
+          remainingMs: decisionDeadlineMs - now,
+        }, { status: 400 });
+      }
+    } else {
+      // 2. Normal turn timeout: verify turn_deadline
+      if (!room.turn_deadline) {
+        return NextResponse.json({ success: true, message: 'No turn deadline active' });
+      }
+      const deadlineMs = new Date(room.turn_deadline).getTime();
+      if (now < deadlineMs) {
+        return NextResponse.json({
+          success: false,
+          error: 'Turn deadline has not expired yet',
+          remainingMs: deadlineMs - now,
+        }, { status: 400 });
+      }
     }
 
     // 2. Fetch Players
@@ -100,24 +116,32 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // 5. Atomic Update Guard: Only update if turn_deadline hasn't changed in DB
-    const { data: updatedRooms, error: updateError } = await supabase
+    // 5. Atomic Update Guard: Only update if turn or pending decision has not changed
+    let updateQuery = supabase
       .from('game_rooms')
       .update({
         ...timeoutResult.updatedRoom,
         updated_at: new Date(now).toISOString(),
       })
       .eq('id', roomId)
-      .eq('turn_deadline', room.turn_deadline)
-      .select('id');
+      .eq('current_turn_seat', room.current_turn_seat);
+
+    if (room.pending_draw_decision) {
+      updateQuery = updateQuery.not('pending_draw_decision', 'is', null);
+    } else {
+      updateQuery = updateQuery.eq('turn_deadline', room.turn_deadline);
+    }
+
+    const { data: updatedRooms, error: updateError } = await updateQuery.select('id');
 
     if (updateError || !updatedRooms || updatedRooms.length === 0) {
       // Another client already resolved this turn deadline
       return NextResponse.json({ success: true, message: 'Turn timeout already handled by another event' });
     }
 
-    // 6. If card was drawn for a player, append to their hand in DB
-    if (timeoutResult.penalizedPlayer && timeoutResult.drawnCard) {
+    // 6. If card(s) were drawn for a player, append to their hand in DB
+    const cardsToAppend = timeoutResult.drawnCards || (timeoutResult.drawnCard ? [timeoutResult.drawnCard] : []);
+    if (timeoutResult.penalizedPlayer && cardsToAppend.length > 0) {
       const penalizedProfileId = timeoutResult.penalizedPlayer.profile_id;
       const { data: handData } = await supabase
         .from('game_player_hands')
@@ -127,7 +151,7 @@ export async function POST(req: Request) {
         .single();
 
       const existingHand: UnoFlipCard[] = (handData?.cards as UnoFlipCard[]) || [];
-      const updatedHand = [...existingHand, timeoutResult.drawnCard];
+      const updatedHand = [...existingHand, ...cardsToAppend];
 
       await supabase
         .from('game_player_hands')
@@ -175,3 +199,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
   }
 }
+

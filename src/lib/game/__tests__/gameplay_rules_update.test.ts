@@ -416,8 +416,8 @@ describe('UNO FLIP Gameplay Rules Update Tests', () => {
 
     expect(playWildResult.success).toBe(true);
     expect(playWildResult.updatedRoom?.active_color).toBe('blue');
-    expect(playWildResult.affectedPlayerId).toBe('prof-bob');
-    expect(playWildResult.penaltyDrawnCards).toHaveLength(2);
+    expect(playWildResult.updatedRoom?.draw_penalty).toBe(2);
+    expect(playWildResult.updatedRoom?.current_turn_seat).toBe(1);
   });
 
   // 11. The turn timer does not cause an extra draw while the draw decision is pending

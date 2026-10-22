@@ -11,19 +11,58 @@ import {
 import { DARK_COLORS, LIGHT_COLORS, shuffleDeck } from './deck';
 
 /**
+ * Calculates the penalty draw value of a card for stacking rules.
+ * Supports canonical UNO FLIP cards and custom sets (draw_one = 1, draw_two / wild_draw_two = 2, draw_five = 5).
+ */
+export function getCardPenaltyValue(card: UnoFlipCard, side: Side): number {
+  const face = side === 'light' ? card.light : card.dark;
+  switch (face.type) {
+    case 'draw_one':
+      return 1;
+    case 'draw_two':
+    case 'wild_draw_two':
+      return 2;
+    case 'draw_five':
+      return 5;
+    default:
+      return 0;
+  }
+}
+
+/**
  * Validates if a card can be legally played onto the current discard pile.
+ * When a penalty stack is active (drawPenalty > 0), only penalty cards with an equal
+ * or higher penalty value may be played, regardless of color. Normal and action cards are rejected.
  */
 export function isValidPlay(
   card: UnoFlipCard,
   topCard: UnoFlipCard | null,
   activeSide: Side,
-  activeColor: CardColor | null
+  activeColor: CardColor | null,
+  drawPenalty = 0
 ): boolean {
   if (!topCard) return true;
 
   const cardFace = activeSide === 'light' ? card.light : card.dark;
   const topFace = activeSide === 'light' ? topCard.light : topCard.dark;
 
+  // Stacking rule: when a penalty stack is active, only penalty cards with value >= current penalty value can be played
+  if (drawPenalty > 0) {
+    const cardPenalty = getCardPenaltyValue(card, activeSide);
+    if (cardPenalty === 0) {
+      // Normal cards and non-penalty action cards cannot be used to continue a penalty stack
+      return false;
+    }
+    const currentPenalty = getCardPenaltyValue(topCard, activeSide);
+    if (currentPenalty > 0 && cardPenalty < currentPenalty) {
+      // Lower-value penalty cards cannot be played on higher-value penalty cards
+      return false;
+    }
+    // Equal or higher penalty card is valid, regardless of its color!
+    return true;
+  }
+
+  // Normal play rules when no penalty stack is active:
   // Wild cards can always be played
   if (cardFace.color === 'wild') {
     return true;
@@ -281,31 +320,19 @@ export function processCardPlay(params: ProcessCardPlayParams): PlayCardResult {
 
     case 'draw_one': { // Light Side (+1)
       nextActiveColor = activeFace.color as CardColor;
-      const targetSeat = calculateNextSeat(player.seat_index, players, nextDirection, 1);
-      const targetPlayer = players.find((p) => p.seat_index === targetSeat);
-      if (targetPlayer) {
-        affectedPlayerId = targetPlayer.profile_id;
-        const drawResult = drawFromPile(newDrawPile, newDiscardPile, 1);
-        penaltyCards = drawResult.drawn;
-        newDrawPile = drawResult.newDrawPile;
-        newDiscardPile = drawResult.newDiscardPile;
-      }
-      step = 2;
+      step = 1;
+      break;
+    }
+
+    case 'draw_two': { // Custom/standard (+2)
+      nextActiveColor = activeFace.color !== 'wild' ? (activeFace.color as CardColor) : null;
+      step = 1;
       break;
     }
 
     case 'draw_five': { // Dark Side (+5)
       nextActiveColor = activeFace.color as CardColor;
-      const targetSeat = calculateNextSeat(player.seat_index, players, nextDirection, 1);
-      const targetPlayer = players.find((p) => p.seat_index === targetSeat);
-      if (targetPlayer) {
-        affectedPlayerId = targetPlayer.profile_id;
-        const drawResult = drawFromPile(newDrawPile, newDiscardPile, 5);
-        penaltyCards = drawResult.drawn;
-        newDrawPile = drawResult.newDrawPile;
-        newDiscardPile = drawResult.newDiscardPile;
-      }
-      step = 2;
+      step = 1;
       break;
     }
 
@@ -324,18 +351,9 @@ export function processCardPlay(params: ProcessCardPlayParams): PlayCardResult {
       step = 1;
       break;
 
-    case 'wild_draw_two': { // Light Side
+    case 'wild_draw_two': { // Light Side (+2)
       nextActiveColor = chosenColor || null;
-      const targetSeat = calculateNextSeat(player.seat_index, players, nextDirection, 1);
-      const targetPlayer = players.find((p) => p.seat_index === targetSeat);
-      if (targetPlayer) {
-        affectedPlayerId = targetPlayer.profile_id;
-        const drawResult = drawFromPile(newDrawPile, newDiscardPile, 2);
-        penaltyCards = drawResult.drawn;
-        newDrawPile = drawResult.newDrawPile;
-        newDiscardPile = drawResult.newDiscardPile;
-      }
-      step = 2;
+      step = 1;
       break;
     }
 
@@ -387,12 +405,19 @@ export function processCardPlay(params: ProcessCardPlayParams): PlayCardResult {
   const turnStartedAt = new Date(now).toISOString();
   const turnDeadline = new Date(now + turnDurationMs).toISOString();
 
+  const cardPenalty = getCardPenaltyValue(card, currentSide);
+  const newDrawPenalty = cardPenalty > 0 ? (room.draw_penalty || 0) + cardPenalty : 0;
+
   const logMessage = `${player.profile?.nickname || 'Player'} played ${
     activeFace.type === 'number'
       ? `${activeFace.color} ${activeFace.value}`
       : `${activeFace.color || ''} ${activeFace.type.replace(/_/g, ' ')}`
   }${activeFace.type === 'flip' ? ' — FLIP!' : ''}${
-    penaltyCards.length > 0 ? ` (+${penaltyCards.length} cards!)` : ''
+    cardPenalty > 0
+      ? ` (+${cardPenalty} cards! Stack total: ${newDrawPenalty})`
+      : penaltyCards.length > 0
+      ? ` (+${penaltyCards.length} cards!)`
+      : ''
   }`;
 
   const actionLog: GameActionLog = {
@@ -415,6 +440,7 @@ export function processCardPlay(params: ProcessCardPlayParams): PlayCardResult {
       direction: nextDirection,
       top_card: card,
       draw_pile_count: newDrawPile.length,
+      draw_penalty: newDrawPenalty,
       uno_called_by: unoCalledBy,
       uno_challenge_target: isGameOver ? null : unoChallengeTarget,
       turn_started_at: isGameOver ? null : turnStartedAt,
@@ -545,6 +571,7 @@ export interface TurnTimeoutResult {
   updatedDrawPile?: UnoFlipCard[];
   updatedDiscardPile?: UnoFlipCard[];
   drawnCard?: UnoFlipCard;
+  drawnCards?: UnoFlipCard[];
   penalizedPlayer?: GamePlayer;
   actionLog?: GameActionLog;
 }
@@ -552,7 +579,7 @@ export interface TurnTimeoutResult {
 /**
  * Pure engine function to process turn expiration when a player fails to act within the 30-second window.
  * If a draw decision was pending, the card is kept and the turn advances without drawing another card.
- * Otherwise, exactly 1 card is drawn for the timed-out player and the turn advances to the next player.
+ * Otherwise, the player draws penalty card(s) (full accumulated stack if active, otherwise 1) and turn passes.
  */
 export function processTurnTimeout(params: TurnTimeoutParams): TurnTimeoutResult {
   const { room, players, drawPile, discardPile } = params;
@@ -563,22 +590,27 @@ export function processTurnTimeout(params: TurnTimeoutParams): TurnTimeoutResult
     return { success: false, error: 'Game is not currently active' };
   }
 
-  if (!room.turn_deadline) {
-    return { success: false, error: 'No turn deadline set' };
-  }
-
-  const deadlineMs = new Date(room.turn_deadline).getTime();
-  if (now < deadlineMs) {
-    return { success: false, error: 'Turn deadline has not expired yet' };
-  }
-
   const currentPlayer = players.find((p) => p.seat_index === room.current_turn_seat);
   if (!currentPlayer) {
     return { success: false, error: 'Current player not found' };
   }
 
-  // If a draw decision is pending, resolve it by keeping the card without drawing another card
+  // 1. If a draw decision is pending:
+  // Suspend the normal turn timer and ONLY verify the decision_deadline!
   if (room.pending_draw_decision && room.pending_draw_decision.player_id === currentPlayer.profile_id) {
+    const decisionDeadline = room.pending_draw_decision.decision_deadline;
+    if (!decisionDeadline) {
+      return { success: false, error: 'Draw decision is pending with no deadline; turn timer suspended.' };
+    }
+    const decisionDeadlineMs = new Date(decisionDeadline).getTime();
+    if (now < decisionDeadlineMs) {
+      return {
+        success: false,
+        error: 'Draw decision deadline has not expired yet',
+      };
+    }
+
+    // Decision deadline has expired: keep the card and advance the turn without drawing another card
     const nextSeat = calculateNextSeat(currentPlayer.seat_index, players, room.direction, 1);
     const actionLog: GameActionLog = {
       type: 'pass',
@@ -603,9 +635,26 @@ export function processTurnTimeout(params: TurnTimeoutParams): TurnTimeoutResult
     };
   }
 
-  // Otherwise draw exactly 1 penalty card and advance the turn
-  const drawResult = drawFromPile(drawPile, discardPile, 1);
-  const drawnCard = drawResult.drawn[0];
+  // If a draw decision is pending for another player, turn timer is suspended
+  if (room.pending_draw_decision) {
+    return { success: false, error: 'Turn timer is suspended while draw decision is pending' };
+  }
+
+  // 2. Normal turn timeout (no draw decision pending)
+  if (!room.turn_deadline) {
+    return { success: false, error: 'No turn deadline set' };
+  }
+
+  const deadlineMs = new Date(room.turn_deadline).getTime();
+  if (now < deadlineMs) {
+    return { success: false, error: 'Turn deadline has not expired yet' };
+  }
+
+  // If a penalty stack is active, timed-out player draws the entire accumulated penalty!
+  const penaltyCount = (room.draw_penalty && room.draw_penalty > 0) ? room.draw_penalty : 1;
+  const drawResult = drawFromPile(drawPile, discardPile, penaltyCount);
+  const drawnCards = drawResult.drawn;
+  const drawnCard = drawnCards[0];
   const nextSeat = calculateNextSeat(currentPlayer.seat_index, players, room.direction, 1);
 
   const actionLog: GameActionLog = {
@@ -614,8 +663,10 @@ export function processTurnTimeout(params: TurnTimeoutParams): TurnTimeoutResult
     playerName: currentPlayer.profile?.nickname || 'Player',
     targetPlayerId: currentPlayer.profile_id,
     targetPlayerName: currentPlayer.profile?.nickname || 'Player',
-    drawnCount: 1,
-    message: `⏱️ ${currentPlayer.profile?.nickname || 'Player'} ran out of time! +1 card penalty and turn passed.`,
+    drawnCount: penaltyCount,
+    message: penaltyCount > 1
+      ? `⏱️ ${currentPlayer.profile?.nickname || 'Player'} ran out of time! Drew +${penaltyCount} accumulated penalty cards and turn passed.`
+      : `⏱️ ${currentPlayer.profile?.nickname || 'Player'} ran out of time! +1 card penalty and turn passed.`,
     timestamp: now,
   };
 
@@ -624,6 +675,7 @@ export function processTurnTimeout(params: TurnTimeoutParams): TurnTimeoutResult
     updatedRoom: {
       current_turn_seat: nextSeat,
       draw_pile_count: drawResult.newDrawPile.length,
+      draw_penalty: 0,
       turn_started_at: new Date(now).toISOString(),
       turn_deadline: new Date(now + turnDurationMs).toISOString(),
       uno_declaration_deadline: null,
@@ -634,6 +686,7 @@ export function processTurnTimeout(params: TurnTimeoutParams): TurnTimeoutResult
     updatedDrawPile: drawResult.newDrawPile,
     updatedDiscardPile: drawResult.newDiscardPile,
     drawnCard,
+    drawnCards,
     penalizedPlayer: currentPlayer,
     actionLog,
   };
@@ -818,7 +871,7 @@ export function processDrawDecision(params: ProcessDrawDecisionParams): ProcessD
   }
 
   // Validate legality
-  const valid = isValidPlay(cardToPlay, room.top_card, room.current_side, room.active_color);
+  const valid = isValidPlay(cardToPlay, room.top_card, room.current_side, room.active_color, room.draw_penalty || 0);
   if (!valid) {
     return { success: false, error: 'Drawn card cannot be legally played' };
   }

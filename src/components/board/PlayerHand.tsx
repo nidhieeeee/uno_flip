@@ -36,40 +36,37 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
   const [peekOtherSide, setPeekOtherSide] = useState(false);
   const [isCallingUno, setIsCallingUno] = useState(false);
   const [justCalledUno, setJustCalledUno] = useState(false);
-  const [unoSecondsLeft, setUnoSecondsLeft] = useState<number | null>(null);
-  const [showPenalty, setShowPenalty] = useState(false);
+  const [showPenalty, setShowPenalty] = useState(isPenalized);
+  const [prevIsPenalized, setPrevIsPenalized] = useState(isPenalized);
+
+  if (isPenalized !== prevIsPenalized) {
+    setPrevIsPenalized(isPenalized);
+    setShowPenalty(isPenalized);
+  }
 
   // Auto-dismiss penalty effect so it only shows for a brief duration (2.5 seconds)
   useEffect(() => {
-    if (isPenalized) {
-      setShowPenalty(true);
-      const timer = setTimeout(() => {
-        setShowPenalty(false);
-      }, 2500);
-      return () => clearTimeout(timer);
-    } else {
+    if (!showPenalty) return;
+    const timer = setTimeout(() => {
       setShowPenalty(false);
-    }
-  }, [isPenalized]);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [showPenalty]);
+
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!unoDeclarationDeadline) {
-      setUnoSecondsLeft(null);
-      return;
-    }
+    if (!unoDeclarationDeadline) return;
 
-    const updateTime = () => {
-      const remaining = Math.max(
-        0,
-        Math.ceil((new Date(unoDeclarationDeadline).getTime() - Date.now()) / 1000)
-      );
-      setUnoSecondsLeft(remaining);
-    };
-
-    updateTime();
-    const interval = setInterval(updateTime, 200);
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 200);
     return () => clearInterval(interval);
   }, [unoDeclarationDeadline]);
+
+  const unoSecondsLeft = unoDeclarationDeadline
+    ? Math.max(0, Math.ceil((new Date(unoDeclarationDeadline).getTime() - currentTime) / 1000))
+    : null;
 
   const displaySide: Side = peekOtherSide
     ? activeSide === 'light'
@@ -95,9 +92,8 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
   return (
     <div
       id="player-hand-container"
-      className={`relative w-full flex flex-col items-center select-none transition-all duration-200 ${
-        showPenalty ? 'p-2 rounded-xl border border-[#ED1C24] bg-[#ED1C24]/10' : ''
-      }`}
+      className={`relative w-full flex flex-col items-center select-none transition-all duration-200 ${showPenalty ? 'p-2 rounded-xl border border-[#ED1C24] bg-[#ED1C24]/10' : ''
+        }`}
     >
       {/* Floating Penalty Notification Badge */}
       {showPenalty && (
@@ -121,19 +117,18 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
         <button
           onClick={handleCallUnoClick}
           disabled={disabled || isCallingUno || hasCalledUno || cards.length !== 1}
-          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-all ${
-            hasCalledUno || justCalledUno
+          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-all ${hasCalledUno || justCalledUno
               ? 'bg-[#27AE60] text-white border border-[#27AE60] shadow-sm cursor-default'
               : isUnoVulnerable
-              ? 'bg-[#FFCC00] text-[#15191F] ring-2 ring-[#ED1C24] ring-offset-2 ring-offset-[#15191F] animate-pulse shadow-md font-black hover:bg-[#E6B800] scale-105 cursor-pointer'
-              : 'bg-[#1E232B] text-[#9BA3AF]/50 border border-[#2D333B] opacity-50 cursor-not-allowed'
-          }`}
+                ? 'bg-[#FFCC00] text-[#15191F] ring-2 ring-[#ED1C24] ring-offset-2 ring-offset-[#15191F] animate-pulse shadow-md font-black hover:bg-[#E6B800] scale-105 cursor-pointer'
+                : 'bg-[#1E232B] text-[#9BA3AF]/50 border border-[#2D333B] opacity-50 cursor-not-allowed'
+            }`}
           title={
             isUnoVulnerable
               ? 'WARNING: You have 1 card! Call UNO immediately!'
               : hasCalledUno || justCalledUno
-              ? 'UNO declared!'
-              : 'You can only call UNO when you have 1 card left'
+                ? 'UNO declared!'
+                : 'You can only call UNO when you have 1 card left'
           }
         >
           {hasCalledUno || justCalledUno ? (
@@ -145,19 +140,18 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
             {hasCalledUno || justCalledUno
               ? 'UNO Declared!'
               : isUnoVulnerable && unoSecondsLeft !== null && unoSecondsLeft > 0
-              ? `Call UNO (${unoSecondsLeft}s)!`
-              : 'Call UNO'}
+                ? `Call UNO (${unoSecondsLeft}s)!`
+                : 'Call UNO'}
           </span>
         </button>
 
         {/* Peek Other Side Toggle Button */}
         <button
           onClick={() => setPeekOtherSide((prev) => !prev)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
-            peekOtherSide
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${peekOtherSide
               ? 'bg-[#1E232B] border-[#FFCC00] text-[#FFCC00]'
               : 'bg-[#1E232B] border-[#2D333B] text-[#9BA3AF] hover:text-white'
-          }`}
+            }`}
         >
           <Eye className="w-3.5 h-3.5" />
           <span>{peekOtherSide ? 'Viewing Other Side' : 'Peek Other Side'}</span>

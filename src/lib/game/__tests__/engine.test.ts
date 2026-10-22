@@ -275,7 +275,7 @@ describe('Turn Advancement & Action Effects', () => {
     expect(res.updatedRoom.current_turn_seat).toBe(0);
   });
 
-  it('processes Draw One: forces next player to draw 1 and skip turn', () => {
+  it('processes Draw One: initiates +1 penalty stack and passes turn to next player', () => {
     const drawOneCard: UnoFlipCard = {
       id: 'd1',
       light: { color: 'blue', type: 'draw_one' },
@@ -300,9 +300,9 @@ describe('Turn Advancement & Action Effects', () => {
       calledUno: false,
     });
 
-    expect(res.affectedPlayerId).toBe('prof-2');
-    expect(res.penaltyDrawnCards).toHaveLength(1);
-    expect(res.updatedRoom.current_turn_seat).toBe(2); // Bob skipped, Charlie next
+    expect(res.penaltyDrawnCards).toHaveLength(0);
+    expect(res.updatedRoom.draw_penalty).toBe(1);
+    expect(res.updatedRoom.current_turn_seat).toBe(1); // Next player (Bob) gets turn to stack or draw
   });
 
   it('processes Flip card: toggles side from light to dark', () => {

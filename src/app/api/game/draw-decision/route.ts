@@ -122,13 +122,22 @@ export async function POST(req: Request) {
 
     // 6. Save DB state
     if (action === 'keep') {
-      await supabase
+      const { data: updatedRooms, error: roomUpdateError } = await supabase
         .from('game_rooms')
         .update({
           ...result.updatedRoom,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', roomId);
+        .eq('id', roomId)
+        .eq('current_turn_seat', currentPlayer.seat_index)
+        .not('pending_draw_decision', 'is', null)
+        .select('id');
+
+      if (roomUpdateError || !updatedRooms || updatedRooms.length === 0) {
+        return NextResponse.json({
+          error: 'Draw decision was already resolved or timed out',
+        }, { status: 409 });
+      }
 
       await supabase.from('game_moves').insert({
         room_id: roomId,
@@ -142,6 +151,24 @@ export async function POST(req: Request) {
 
     // action === 'play'
     const remainingHand = result.updatedHand || [];
+
+    // Atomically claim the draw decision on the room first
+    const { data: updatedRooms, error: roomUpdateError } = await supabase
+      .from('game_rooms')
+      .update({
+        ...result.updatedRoom,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', roomId)
+      .eq('current_turn_seat', currentPlayer.seat_index)
+      .not('pending_draw_decision', 'is', null)
+      .select('id');
+
+    if (roomUpdateError || !updatedRooms || updatedRooms.length === 0) {
+      return NextResponse.json({
+        error: 'Draw decision was already resolved or timed out',
+      }, { status: 409 });
+    }
 
     // If opponents received penalty cards, update them
     if (result.affectedPlayerId && result.penaltyDrawnCards && result.penaltyDrawnCards.length > 0) {
@@ -192,15 +219,6 @@ export async function POST(req: Request) {
       })
       .eq('id', currentPlayer.id);
 
-    // Update room
-    await supabase
-      .from('game_rooms')
-      .update({
-        ...result.updatedRoom,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', roomId);
-
     // Update deck
     await supabase
       .from('game_decks_private')
@@ -229,3 +247,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
   }
 }
+

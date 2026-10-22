@@ -70,26 +70,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   } | null>(null);
   const [actionBanner, setActionBanner] = useState<string | null>(null);
   const [soundMuted, setSoundMutedState] = useState(isSoundMuted());
-  const [turnSecondsLeft, setTurnSecondsLeft] = useState<number | null>(null);
+  const [currentTurnTime, setCurrentTurnTime] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!room.turn_deadline || room.status !== 'playing') {
-      setTurnSecondsLeft(null);
+    // Suspend countdown if draw decision is pending or no deadline is set
+    if (room.pending_draw_decision || !room.turn_deadline || room.status !== 'playing') {
       return;
     }
 
-    const updateTimer = () => {
-      const remaining = Math.max(
-        0,
-        Math.ceil((new Date(room.turn_deadline!).getTime() - Date.now()) / 1000)
-      );
-      setTurnSecondsLeft(remaining);
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 200);
+    const interval = setInterval(() => {
+      setCurrentTurnTime(Date.now());
+    }, 200);
     return () => clearInterval(interval);
-  }, [room.turn_deadline, room.status]);
+  }, [room.turn_deadline, room.pending_draw_decision, room.status]);
+
+  const turnSecondsLeft =
+    !room.pending_draw_decision && room.turn_deadline && room.status === 'playing'
+      ? Math.max(0, Math.ceil((new Date(room.turn_deadline).getTime() - currentTurnTime) / 1000))
+      : null;
 
   const boardRef = useRef<HTMLDivElement>(null);
   const prevSideRef = useRef<Side>(room.current_side);
@@ -151,17 +149,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       if (!targetId) return;
 
       const isTargetMe = targetId === me?.profile_id;
-      setPenalizedPlayerId(targetId);
-
       let bannerMsg = action.message || 'Penalty applied!';
       if (action.type === 'challenge_uno' && isTargetMe) {
         bannerMsg = 'CAUGHT! You forgot to call UNO! (+2 cards penalty)';
       }
 
-      setPenaltyAnnouncement({
-        message: bannerMsg,
-        isTargetMe,
-      });
+      setTimeout(() => {
+        setPenalizedPlayerId(targetId);
+        setPenaltyAnnouncement({
+          message: bannerMsg,
+          isTargetMe,
+        });
+      }, 0);
 
       // Play penalty sound
       playPenaltySound();
@@ -223,7 +222,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       }, 2500);
     } else if (action.message) {
       // Normal game action banner (play, pass, flip) — auto-dismiss after 3s
-      setActionBanner(action.message);
+      setTimeout(() => {
+        setActionBanner(action.message);
+      }, 0);
       if (actionBannerTimerRef.current) {
         clearTimeout(actionBannerTimerRef.current);
       }
@@ -232,14 +233,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         actionBannerTimerRef.current = null;
       }, 3000);
     }
-  }, [
-    room.last_action?.timestamp,
-    room.last_action?.type,
-    room.last_action?.message,
-    room.last_action?.targetPlayerId,
-    room.last_action?.playerId,
-    me?.profile_id,
-  ]);
+  }, [room.last_action, me?.profile_id]);
 
   // Handle card click
   const handleCardClick = async (card: UnoFlipCard) => {
@@ -285,11 +279,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         {/* Room Info & Side Indicator */}
         <div className="flex items-center gap-2 sm:gap-3">
           <div
-            className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold uppercase tracking-wider ${
-              isLight
+            className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold uppercase tracking-wider ${isLight
                 ? 'bg-[#FFCC00] text-[#15191F]'
                 : 'bg-[#2D333B] text-white border border-[#404752]'
-            }`}
+              }`}
           >
             <FlipHorizontal className="w-3.5 h-3.5" />
             <span>{isLight ? 'Light Side' : 'Dark Side'}</span>
@@ -303,11 +296,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         {/* Action Banner / Turn Banner */}
         <div className="flex items-center">
           <div
-            className={`px-4 py-1.5 rounded text-xs font-bold flex items-center gap-2 transition-all ${
-              isMyTurn
+            className={`px-4 py-1.5 rounded text-xs font-bold flex items-center gap-2 transition-all ${isMyTurn
                 ? 'bg-[#FFCC00] text-[#15191F]'
                 : 'bg-[#1E232B] text-[#9BA3AF] border border-[#2D333B]'
-            }`}
+              }`}
           >
             <Clock className="w-3.5 h-3.5" />
             <span>{activePlayerName}</span>
@@ -426,12 +418,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             )}
           </div>
 
+          {/* Active Penalty Stack Badge */}
+          {(room.draw_penalty || 0) > 0 && (
+            <div className="absolute -top-3.5 right-4 flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#ED1C24] text-white text-[11px] font-black uppercase tracking-wider shadow-lg animate-pulse ring-2 ring-[#ED1C24]/50">
+              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+              <span>STACK: +{room.draw_penalty} CARDS</span>
+            </div>
+          )}
+
           {/* Draw Pile */}
           <DeckPile
             count={room.draw_pile_count}
             activeSide={room.current_side}
             isMyTurn={isMyTurn}
             onDraw={onDrawCard}
+            drawPenalty={room.draw_penalty}
           />
 
           {/* Discard Pile */}
@@ -445,28 +446,43 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         {/* Turn Prompt Hint & Synchronized Turn Countdown */}
         {room.status === 'playing' && (
           <div className="mt-3 flex flex-col sm:flex-row items-center gap-2">
-            {turnSecondsLeft !== null && (
-              <div
-                className={`px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase flex items-center gap-1.5 transition-all shadow-md ${
-                  turnSecondsLeft <= 5
-                    ? 'bg-[#ED1C24] text-white animate-pulse ring-2 ring-[#ED1C24]/60'
-                    : turnSecondsLeft <= 10
-                    ? 'bg-[#E65100] text-white'
-                    : 'bg-[#15191F] border border-[#2D333B] text-[#FFCC00]'
-                }`}
-              >
-                <Clock className="w-3.5 h-3.5" />
+            {room.pending_draw_decision ? (
+              <div className="px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase flex items-center gap-1.5 bg-[#1E232B] border border-[#FFCC00]/40 text-[#FFCC00] shadow-md">
+                <Clock className="w-3.5 h-3.5 animate-pulse" />
                 <span>
-                  {room.pending_draw_decision
-                    ? `DECISION: ${turnSecondsLeft}s`
-                    : `TURN: ${turnSecondsLeft}s`}
+                  {room.pending_draw_decision.player_id === me?.profile_id
+                    ? 'DECISION PENDING'
+                    : 'PLAYER DECIDING...'}
                 </span>
               </div>
+            ) : (
+              turnSecondsLeft !== null && (
+                <div
+                  className={`px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase flex items-center gap-1.5 transition-all shadow-md ${
+                    turnSecondsLeft <= 5
+                      ? 'bg-[#ED1C24] text-white animate-pulse ring-2 ring-[#ED1C24]/60'
+                      : turnSecondsLeft <= 10
+                      ? 'bg-[#E65100] text-white'
+                      : 'bg-[#15191F] border border-[#2D333B] text-[#FFCC00]'
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>TURN: {turnSecondsLeft}s</span>
+                </div>
+              )
             )}
 
-            {isMyTurn && (
-              <div className="text-xs sm:text-sm font-bold text-[#FFCC00] tracking-wide flex items-center gap-1.5">
-                <span>YOUR TURN: Play a matching card or draw from the deck</span>
+            {isMyTurn && !room.pending_draw_decision && (
+              <div className="text-xs sm:text-sm font-bold tracking-wide flex items-center gap-1.5">
+                {(room.draw_penalty || 0) > 0 ? (
+                  <span className="text-[#FF8080] font-black animate-pulse">
+                    🔥 PENALTY ACTIVE: Stack equal or higher penalty card (+{room.draw_penalty} pending) or draw!
+                  </span>
+                ) : (
+                  <span className="text-[#FFCC00]">
+                    YOUR TURN: Play a matching card or draw from the deck
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -480,7 +496,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           activeSide={room.current_side}
           isMyTurn={isMyTurn}
           isValidCard={(card) =>
-            isValidPlay(card, room.top_card, room.current_side, room.active_color)
+            isValidPlay(card, room.top_card, room.current_side, room.active_color, room.draw_penalty || 0)
           }
           onPlayCard={handleCardClick}
           onCallUno={onCallUno}
@@ -516,7 +532,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         isOpen={Boolean(
           room.status === 'playing' &&
           room.pending_draw_decision &&
-          room.pending_draw_decision.player_id === me?.profile_id
+          room.pending_draw_decision.player_id === me?.profile_id &&
+          !showColorPicker
         )}
         card={room.pending_draw_decision?.card || null}
         side={room.current_side}

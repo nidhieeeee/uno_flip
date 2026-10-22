@@ -73,7 +73,7 @@ describe('Multiplayer Game Rules & Penalties', () => {
     dark: { color: 'orange', type: 'number', value: (i % 9) + 1 },
   }));
 
-  it('Wild Draw Two applies 2 penalty cards to next player and skips their turn', () => {
+  it('Wild Draw Two initiates 2 penalty cards stack and advances to next player', () => {
     const wildDrawTwo: UnoFlipCard = {
       id: 'w-d2',
       light: { color: 'wild', type: 'wild_draw_two' },
@@ -91,14 +91,14 @@ describe('Multiplayer Game Rules & Penalties', () => {
       calledUno: true,
     });
 
-    expect(res.affectedPlayerId).toBe('prof-bob');
-    expect(res.penaltyDrawnCards).toHaveLength(2);
+    expect(res.penaltyDrawnCards).toHaveLength(0);
+    expect(res.updatedRoom.draw_penalty).toBe(2);
     expect(res.updatedRoom.active_color).toBe('blue');
-    // Bob (seat 1) skipped -> Charlie (seat 2) is next
-    expect(res.updatedRoom.current_turn_seat).toBe(2);
+    // Bob (seat 1) gets turn to stack or draw
+    expect(res.updatedRoom.current_turn_seat).toBe(1);
   });
 
-  it('Draw Five on Dark Side applies 5 penalty cards to next player and skips their turn', () => {
+  it('Draw Five on Dark Side initiates 5 penalty cards stack and advances to next player', () => {
     const darkRoom: GameRoom = {
       ...baseRoom,
       current_side: 'dark',
@@ -121,9 +121,10 @@ describe('Multiplayer Game Rules & Penalties', () => {
       calledUno: false,
     });
 
-    expect(res.affectedPlayerId).toBe('prof-bob');
-    expect(res.penaltyDrawnCards).toHaveLength(5);
-    expect(res.updatedRoom.current_turn_seat).toBe(2);
+    expect(res.penaltyDrawnCards).toHaveLength(0);
+    expect(res.updatedRoom.draw_penalty).toBe(5);
+    // Bob (seat 1) gets turn to stack or draw
+    expect(res.updatedRoom.current_turn_seat).toBe(1);
   });
 
   it('Wild Draw Color on Dark Side forces next player to draw until target dark color appears', () => {
