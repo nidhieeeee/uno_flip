@@ -39,7 +39,7 @@ export const DiscardPile: React.FC<DiscardPileProps> = ({
   };
 
   return (
-    <div className="flex flex-col items-center select-none">
+    <div id="discard-pile-container" className="flex flex-col items-center select-none">
       {/* Top Discard Card */}
       <div className="relative p-0.5 rounded-lg">
         {topCard ? (

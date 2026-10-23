@@ -10,7 +10,10 @@ interface UnoCardProps {
   isPlayable?: boolean;
   onClick?: () => void;
   className?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'custom';
+  style?: React.CSSProperties;
+  width?: number;
+  height?: number;
 }
 
 export const UnoCard: React.FC<UnoCardProps> = ({
@@ -20,15 +23,26 @@ export const UnoCard: React.FC<UnoCardProps> = ({
   onClick,
   className = '',
   size = 'md',
+  style,
+  width,
+  height,
 }) => {
   const face = side === 'light' ? card.light : card.dark;
   const isLight = side === 'light';
 
-  // Dimension presets
+  const effectiveWidth =
+    typeof width === 'number'
+      ? width
+      : typeof style?.width === 'number'
+      ? (style.width as number)
+      : undefined;
+
+  // Dimension presets when explicit width/height is not provided
   const sizeStyles = {
     sm: 'w-14 h-20 text-xs rounded-md',
     md: 'w-20 h-28 sm:w-24 sm:h-36 text-sm sm:text-base rounded-lg',
     lg: 'w-28 h-40 sm:w-32 sm:h-48 text-base sm:text-lg rounded-xl',
+    custom: 'rounded-lg text-xs',
   }[size];
 
   // Classic Flat Solid Colors
@@ -85,10 +99,31 @@ export const UnoCard: React.FC<UnoCardProps> = ({
   };
 
   const renderSymbol = () => {
+    const isSmall = effectiveWidth !== undefined && effectiveWidth < 64;
+    const isMedium = effectiveWidth !== undefined && effectiveWidth < 90;
+
+    const numTextClass = isSmall
+      ? 'text-xl sm:text-2xl'
+      : isMedium
+      ? 'text-2xl sm:text-3xl'
+      : 'text-3xl sm:text-5xl';
+
+    const actionTextClass = isSmall
+      ? 'text-base sm:text-lg'
+      : isMedium
+      ? 'text-xl sm:text-2xl'
+      : 'text-2xl sm:text-3xl';
+
+    const iconClass = isSmall
+      ? 'w-4 h-4 stroke-[2.2]'
+      : isMedium
+      ? 'w-5 h-5 sm:w-6 sm:h-6 stroke-[2.3]'
+      : 'w-6 h-6 sm:w-8 sm:h-8 stroke-[2.5]';
+
     if (face.type === 'number') {
       return (
         <span
-          className={`font-black text-3xl sm:text-5xl tracking-tighter select-none ${getSymbolColorClass(
+          className={`font-black tracking-tighter select-none ${numTextClass} ${getSymbolColorClass(
             face.color
           )}`}
         >
@@ -100,7 +135,7 @@ export const UnoCard: React.FC<UnoCardProps> = ({
     if (face.type === 'draw_one') {
       return (
         <span
-          className={`font-black text-2xl sm:text-3xl select-none ${getSymbolColorClass(
+          className={`font-black select-none ${actionTextClass} ${getSymbolColorClass(
             face.color
           )}`}
         >
@@ -112,7 +147,7 @@ export const UnoCard: React.FC<UnoCardProps> = ({
     if (face.type === 'draw_five') {
       return (
         <span
-          className={`font-black text-2xl sm:text-3xl select-none ${getSymbolColorClass(
+          className={`font-black select-none ${actionTextClass} ${getSymbolColorClass(
             face.color
           )}`}
         >
@@ -122,18 +157,20 @@ export const UnoCard: React.FC<UnoCardProps> = ({
     }
 
     if (face.type === 'wild_draw_two') {
-      return <span className="font-black text-2xl sm:text-3xl select-none text-white">+2</span>;
+      return <span className={`font-black select-none text-white ${actionTextClass}`}>+2</span>;
     }
 
     if (face.type === 'wild_draw_five') {
-      return <span className="font-black text-2xl sm:text-3xl select-none text-white">+5</span>;
+      return <span className={`font-black select-none text-white ${actionTextClass}`}>+5</span>;
     }
 
     if (face.type === 'wild_draw_color') {
       return (
         <div className="flex flex-col items-center select-none text-white">
-          <Sparkles className="w-5 h-5 sm:w-7 sm:h-7 text-[#FFCC00]" />
-          <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider">COLOR</span>
+          <Sparkles className={isSmall ? 'w-4 h-4 text-[#FFCC00]' : 'w-5 h-5 sm:w-7 sm:h-7 text-[#FFCC00]'} />
+          <span className={isSmall ? 'text-[8px] font-black uppercase' : 'text-[10px] sm:text-xs font-black uppercase tracking-wider'}>
+            COLOR
+          </span>
         </div>
       );
     }
@@ -141,22 +178,24 @@ export const UnoCard: React.FC<UnoCardProps> = ({
     if (face.type === 'reverse') {
       return (
         <RefreshCw
-          className={`w-6 h-6 sm:w-9 sm:h-9 stroke-[2.5] ${getSymbolColorClass(face.color)}`}
+          className={`${iconClass} ${getSymbolColorClass(face.color)}`}
         />
       );
     }
 
     if (face.type === 'skip') {
       return (
-        <Ban className={`w-6 h-6 sm:w-9 sm:h-9 stroke-[2.5] ${getSymbolColorClass(face.color)}`} />
+        <Ban className={`${iconClass} ${getSymbolColorClass(face.color)}`} />
       );
     }
 
     if (face.type === 'skip_everyone') {
       return (
         <div className="flex flex-col items-center">
-          <Users className={`w-5 h-5 sm:w-8 sm:h-8 ${getSymbolColorClass(face.color)}`} />
-          <span className="text-[9px] font-black uppercase tracking-widest text-white">ALL</span>
+          <Users className={`${iconClass} ${getSymbolColorClass(face.color)}`} />
+          <span className={isSmall ? 'text-[7px] font-black uppercase text-white' : 'text-[9px] font-black uppercase tracking-widest text-white'}>
+            ALL
+          </span>
         </div>
       );
     }
@@ -165,9 +204,9 @@ export const UnoCard: React.FC<UnoCardProps> = ({
       return (
         <div className="flex flex-col items-center">
           <FlipHorizontal
-            className={`w-6 h-6 sm:w-8 sm:h-8 stroke-[2.5] ${getSymbolColorClass(face.color)}`}
+            className={`${iconClass} ${getSymbolColorClass(face.color)}`}
           />
-          <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-800">
+          <span className={isSmall ? 'text-[7px] font-black uppercase text-slate-800' : 'text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-800'}>
             FLIP
           </span>
         </div>
@@ -175,8 +214,9 @@ export const UnoCard: React.FC<UnoCardProps> = ({
     }
 
     if (face.type === 'wild') {
+      const circleSize = isSmall ? 'w-6 h-6' : isMedium ? 'w-7 h-7 sm:w-9 sm:h-9' : 'w-8 h-8 sm:w-12 sm:h-12';
       return (
-        <div className="relative w-8 h-8 sm:w-12 sm:h-12 rounded-full overflow-hidden border border-white">
+        <div className={`relative ${circleSize} rounded-full overflow-hidden border border-white`}>
           {isLight ? (
             <div className="w-full h-full grid grid-cols-2 grid-rows-2">
               <div className="bg-[#ED1C24]" />
@@ -215,41 +255,58 @@ export const UnoCard: React.FC<UnoCardProps> = ({
     return '';
   };
 
+  const isSmall = effectiveWidth !== undefined && effectiveWidth < 64;
+  const isMedium = effectiveWidth !== undefined && effectiveWidth < 90;
+
+  const cornerTextClass = isSmall
+    ? 'text-[10px]'
+    : isMedium
+    ? 'text-[11px]'
+    : 'text-[11px] sm:text-xs';
+
   return (
     <div
       onClick={isPlayable && onClick ? onClick : undefined}
-      className={`relative select-none transition-colors duration-150 ${sizeStyles} ${isPlayable
-          ? 'cursor-pointer ring-2 ring-[#FFCC00]'
+      style={{
+        ...(typeof width === 'number' ? { width: `${width}px` } : {}),
+        ...(typeof height === 'number' ? { height: `${height}px` } : {}),
+        ...style,
+      }}
+      className={`relative select-none transition-colors duration-150 ${sizeStyles || ''} ${
+        isPlayable
+          ? 'cursor-pointer ring-2 ring-[#FFCC00] hover:brightness-105'
           : 'cursor-default opacity-95'
-        } ${className}`}
+      } ${className}`}
     >
       {/* Outer Card Frame: Classic White Border on Light, Dark Border on Dark */}
       <div
-        className={`w-full h-full rounded-[inherit] p-1.5 flex flex-col justify-between border ${isLight
+        className={`w-full h-full rounded-[inherit] ${isSmall ? 'p-1' : 'p-1.5'} flex flex-col justify-between border ${
+          isLight
             ? 'bg-white border-slate-300 shadow-sm'
             : 'bg-[#111418] border-[#2D333B] shadow-sm'
-          }`}
+        }`}
       >
         {/* Inner Solid Card Body */}
         <div
           className={`relative w-full h-full rounded-[calc(inherit-3px)] ${getCardBgColor(
             face.color
-          )} flex flex-col justify-between p-1 sm:p-1.5 overflow-hidden`}
+          )} flex flex-col justify-between ${isSmall ? 'p-0.5' : 'p-1 sm:p-1.5'} overflow-hidden`}
         >
           {/* Top-Left Corner Symbol */}
-          <div className="flex items-center justify-start text-[11px] sm:text-xs font-black leading-none">
+          <div className={`flex items-center justify-start ${cornerTextClass} font-black leading-none`}>
             {cornerLabel()}
           </div>
 
           {/* Classic Center Oval */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div
-              className={`w-4/5 h-3/5 rounded-[50%] transform -rotate-[25deg] flex items-center justify-center border ${face.color === 'wild'
+              className={`w-4/5 h-3/5 rounded-[50%] transform -rotate-[25deg] flex items-center justify-center border ${
+                face.color === 'wild'
                   ? 'bg-transparent border-transparent'
                   : isLight
-                    ? 'bg-white border-slate-200'
-                    : 'bg-white border-slate-300'
-                }`}
+                  ? 'bg-white border-slate-200'
+                  : 'bg-white border-slate-300'
+              }`}
             >
               <div className="transform rotate-[25deg] flex items-center justify-center">
                 {renderSymbol()}
@@ -258,7 +315,7 @@ export const UnoCard: React.FC<UnoCardProps> = ({
           </div>
 
           {/* Bottom-Right Corner Symbol (Rotated 180) */}
-          <div className="flex items-center justify-end text-[11px] sm:text-xs font-black leading-none rotate-180">
+          <div className={`flex items-center justify-end ${cornerTextClass} font-black leading-none rotate-180`}>
             {cornerLabel()}
           </div>
         </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { CardColor, GamePlayer, GameRoom, PlayerProfile, Side, UnoFlipCard } from '@/lib/game/types';
 import { isValidPlay } from '@/lib/game/engine';
@@ -13,6 +13,7 @@ import { GameOverModal } from '../modals/GameOverModal';
 import { HowToPlayModal } from '../modals/HowToPlayModal';
 import { DrawDecisionModal } from '../modals/DrawDecisionModal';
 import { isSoundMuted, playFlipSound, playPenaltySound, toggleSoundMuted } from '@/lib/audio/sound';
+import { launchCardPlayOverlay } from '@/lib/game/cardAnimation';
 import {
   Clock,
   FlipHorizontal,
@@ -184,30 +185,32 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             { x: 0, duration: 0.45, ease: 'elastic.out(1, 0.3)' }
           );
 
-          // Fly penalty cards from draw pile to target
-          const cardCountToFly = Math.min(action.drawnCount || 2, 3);
-          for (let i = 0; i < cardCountToFly; i++) {
-            const flyCard = document.createElement('div');
-            flyCard.className =
-              'fixed z-50 pointer-events-none w-12 h-16 sm:w-16 sm:h-24 rounded-lg bg-[#ED1C24] border-2 border-white shadow-2xl flex items-center justify-center font-black text-sm text-white select-none';
-            flyCard.innerText = '+1';
-            flyCard.style.left = `${deckRect.left + deckRect.width / 2 - 24}px`;
-            flyCard.style.top = `${deckRect.top + deckRect.height / 2 - 32}px`;
-            document.body.appendChild(flyCard);
+          // Fly penalty cards from draw pile to opponent seats (player's hand animates the real cards)
+          if (!isTargetMe) {
+            const cardCountToFly = Math.min(action.drawnCount || 2, 3);
+            for (let i = 0; i < cardCountToFly; i++) {
+              const flyCard = document.createElement('div');
+              flyCard.className =
+                'fixed z-50 pointer-events-none w-12 h-16 sm:w-16 sm:h-24 rounded-lg bg-[#ED1C24] border-2 border-white shadow-2xl flex items-center justify-center font-black text-sm text-white select-none';
+              flyCard.innerText = '+1';
+              flyCard.style.left = `${deckRect.left + deckRect.width / 2 - 24}px`;
+              flyCard.style.top = `${deckRect.top + deckRect.height / 2 - 32}px`;
+              document.body.appendChild(flyCard);
 
-            gsap.to(flyCard, {
-              x: targetRect.left + targetRect.width / 2 - (deckRect.left + deckRect.width / 2),
-              y: targetRect.top + targetRect.height / 2 - (deckRect.top + deckRect.height / 2),
-              rotation: i === 0 ? 360 : -360,
-              scale: 0.7,
-              opacity: 0.1,
-              delay: i * 0.14,
-              duration: 0.6,
-              ease: 'power2.inOut',
-              onComplete: () => {
-                flyCard.remove();
-              },
-            });
+              gsap.to(flyCard, {
+                x: targetRect.left + targetRect.width / 2 - (deckRect.left + deckRect.width / 2),
+                y: targetRect.top + targetRect.height / 2 - (deckRect.top + deckRect.height / 2),
+                rotation: i === 0 ? 360 : -360,
+                scale: 0.7,
+                opacity: 0.1,
+                delay: i * 0.14,
+                duration: 0.6,
+                ease: 'power2.inOut',
+                onComplete: () => {
+                  flyCard.remove();
+                },
+              });
+            }
           }
         }
       }
@@ -237,30 +240,51 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   }, [room.last_action, me?.profile_id]);
 
   // Handle card click
-  const handleCardClick = async (card: UnoFlipCard) => {
-    const face = isLight ? card.light : card.dark;
-    if (face.color === 'wild') {
-      setPendingCard(card);
-      setShowColorPicker(true);
-      return;
-    }
+  const handleCardClick = useCallback(
+    async (card: UnoFlipCard) => {
+      const face = room.current_side === 'light' ? card.light : card.dark;
+      if (face.color === 'wild') {
+        setPendingCard(card);
+        setShowColorPicker(true);
+        return;
+      }
 
-    await onPlayCard(card.id, undefined, me?.has_called_uno);
-  };
+      await onPlayCard(card.id, undefined, me?.has_called_uno);
+    },
+    [room.current_side, onPlayCard, me?.has_called_uno]
+  );
 
   const handleColorSelected = async (chosenColor: CardColor) => {
     if (!pendingCard) return;
+    const cardId = pendingCard.id;
+    const isFromDraw = isFromDrawDecision;
+
     setShowColorPicker(false);
-    if (isFromDrawDecision) {
-      setIsFromDrawDecision(false);
+    setPendingCard(null);
+    setIsFromDrawDecision(false);
+
+    // Launch flying overlay for the played wild card as a separate temporary overlay
+    if (typeof window !== 'undefined') {
+      const el = document.querySelector(`[data-card-id="${cardId}"]`) as HTMLElement;
+      if (el) {
+        launchCardPlayOverlay(el, cardId);
+      }
+    }
+
+    if (isFromDraw) {
       if (onSubmitDrawDecision) {
         await onSubmitDrawDecision('play', chosenColor);
       }
     } else {
-      await onPlayCard(pendingCard.id, chosenColor, me?.has_called_uno);
+      await onPlayCard(cardId, chosenColor, me?.has_called_uno);
     }
-    setPendingCard(null);
   };
+
+  const isValidCard = useCallback(
+    (card: UnoFlipCard) =>
+      isValidPlay(card, room.top_card, room.current_side, room.active_color, room.draw_penalty || 0),
+    [room.top_card, room.current_side, room.active_color, room.draw_penalty]
+  );
 
   // Organize opponents around the table relative to current player seat
   const mySeat = me?.seat_index ?? 0;
@@ -496,9 +520,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           cards={myHand}
           activeSide={room.current_side}
           isMyTurn={isMyTurn}
-          isValidCard={(card) =>
-            isValidPlay(card, room.top_card, room.current_side, room.active_color, room.draw_penalty || 0)
-          }
+          isValidCard={isValidCard}
           onPlayCard={handleCardClick}
           onCallUno={onCallUno}
           hasCalledUno={me?.has_called_uno ?? false}
@@ -553,6 +575,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             setIsFromDrawDecision(true);
             setShowColorPicker(true);
             return;
+          }
+          if (typeof window !== 'undefined') {
+            const el = document.querySelector(`[data-card-id="${card.id}"]`) as HTMLElement;
+            if (el) {
+              launchCardPlayOverlay(el, card.id);
+            }
           }
           if (onSubmitDrawDecision) {
             await onSubmitDrawDecision('play');

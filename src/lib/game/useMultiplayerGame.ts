@@ -10,6 +10,17 @@ import {
   PlayerProfile,
   UnoFlipCard,
 } from './types';
+import { cancelCardFlight } from './cardAnimation';
+
+function areHandsIdentical(prev: UnoFlipCard[], next: UnoFlipCard[]): boolean {
+  if (prev === next) return true;
+  if (!prev || !next) return false;
+  if (prev.length !== next.length) return false;
+  for (let i = 0; i < prev.length; i++) {
+    if (prev[i].id !== next[i].id) return false;
+  }
+  return true;
+}
 
 export function useMultiplayerGame(roomCode: string | null) {
   const [room, setRoom] = useState<GameRoom | null>(null);
@@ -20,6 +31,11 @@ export function useMultiplayerGame(roomCode: string | null) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const updateMyHandIfChanged = (newHand: UnoFlipCard[] | undefined) => {
+    const cards = newHand || [];
+    setMyHand((prev) => (areHandsIdentical(prev, cards) ? prev : cards));
+  };
 
   // Refresh entire game state from server
   const refreshState = useCallback(async (codeToFetch?: string) => {
@@ -43,7 +59,7 @@ export function useMultiplayerGame(roomCode: string | null) {
       setRoom(data.room);
       setPlayers(data.players || []);
       setMe(data.me);
-      setMyHand(data.myHand || []);
+      updateMyHandIfChanged(data.myHand);
       if (data.currentProfile) {
         setCurrentProfile(data.currentProfile);
       }
@@ -73,7 +89,7 @@ export function useMultiplayerGame(roomCode: string | null) {
             setRoom(data.room);
             setPlayers(data.players || []);
             setMe(data.me);
-            setMyHand(data.myHand || []);
+            updateMyHandIfChanged(data.myHand);
             if (data.currentProfile) {
               setCurrentProfile(data.currentProfile);
             }
@@ -162,7 +178,7 @@ export function useMultiplayerGame(roomCode: string | null) {
       },
       (payload: any) => {
         if (payload.new && payload.new.profile_id === profileId) {
-          setMyHand(payload.new.cards || []);
+          updateMyHandIfChanged(payload.new.cards);
         }
       }
     );
@@ -283,6 +299,13 @@ export function useMultiplayerGame(roomCode: string | null) {
   ) => {
     if (!room || isSubmitting) return;
     setIsSubmitting(true);
+
+    // Save previous hand for rollback on failure
+    const prevHand = myHand;
+
+    // Immediately remove the played card from the rendered hand
+    setMyHand((prev) => prev.filter((c) => c.id !== cardId));
+
     try {
       const res = await apiFetch('/api/game/play', {
         method: 'POST',
@@ -296,6 +319,8 @@ export function useMultiplayerGame(roomCode: string | null) {
       });
       const data = await res.json();
       if (!res.ok) {
+        cancelCardFlight(cardId);
+        setMyHand(prevHand);
         if (data.requiresColorSelection) {
           return { requiresColorSelection: true, cardId: data.cardId, side: data.side };
         }
@@ -303,11 +328,13 @@ export function useMultiplayerGame(roomCode: string | null) {
       }
 
       if (data.myHand) {
-        setMyHand(data.myHand);
+        updateMyHandIfChanged(data.myHand);
       }
       await refreshState();
       return { success: true };
     } catch (err: any) {
+      cancelCardFlight(cardId);
+      setMyHand(prevHand);
       alert(err.message);
       return { error: err.message };
     } finally {
@@ -329,7 +356,7 @@ export function useMultiplayerGame(roomCode: string | null) {
         throw new Error(data.error || 'Draw failed');
       }
       if (data.myHand) {
-        setMyHand(data.myHand);
+        updateMyHandIfChanged(data.myHand);
       }
       if (data.pendingDecision) {
         // Immediately pause normal turn timer and activate draw decision popup
@@ -356,6 +383,14 @@ export function useMultiplayerGame(roomCode: string | null) {
   const submitDrawDecision = async (action: 'play' | 'keep', chosenColor?: CardColor) => {
     if (!room || isSubmitting) return;
     setIsSubmitting(true);
+    const prevHand = myHand;
+    const drawnCardId = room.pending_draw_decision?.card?.id;
+
+    if (action === 'play' && drawnCardId) {
+      // Immediately remove the played drawn card from the rendered hand
+      setMyHand((prev) => prev.filter((c) => c.id !== drawnCardId));
+    }
+
     try {
       const res = await apiFetch('/api/game/draw-decision', {
         method: 'POST',
@@ -364,13 +399,15 @@ export function useMultiplayerGame(roomCode: string | null) {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (drawnCardId) cancelCardFlight(drawnCardId);
+        setMyHand(prevHand);
         if (data.requiresColorSelection) {
           return { requiresColorSelection: true, cardId: data.cardId, side: data.side };
         }
         throw new Error(data.error || 'Draw decision failed');
       }
       if (data.myHand) {
-        setMyHand(data.myHand);
+        updateMyHandIfChanged(data.myHand);
       }
       // Optimistically clear the pending decision modal
       setRoom((prev) =>
@@ -384,6 +421,8 @@ export function useMultiplayerGame(roomCode: string | null) {
       await refreshState();
       return { success: true, action: data.action };
     } catch (err: any) {
+      if (drawnCardId) cancelCardFlight(drawnCardId);
+      setMyHand(prevHand);
       alert(err.message);
       await refreshState();
       return { error: err.message };
