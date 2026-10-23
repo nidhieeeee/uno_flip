@@ -119,18 +119,30 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       prevSideRef.current = room.current_side;
       playFlipSound();
 
-      // Animate 3D board flip cleanly and quickly
-      gsap.fromTo(
-        boardRef.current,
-        { rotateY: -180, scale: 0.95, opacity: 0.7 },
-        {
-          rotateY: 0,
-          scale: 1,
-          opacity: 1,
-          duration: 0.5,
-          ease: 'power2.out',
-        }
-      );
+      const isReducedMotion =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (isReducedMotion) {
+        gsap.fromTo(
+          boardRef.current,
+          { opacity: 0.6 },
+          { opacity: 1, duration: 0.2, ease: 'power1.out' }
+        );
+      } else {
+        // Animate 3D board flip cleanly and quickly
+        gsap.fromTo(
+          boardRef.current,
+          { rotateY: -180, scale: 0.95, opacity: 0.7 },
+          {
+            rotateY: 0,
+            scale: 1,
+            opacity: 1,
+            duration: 0.5,
+            ease: 'power2.out',
+          }
+        );
+      }
     }
   }, [room.current_side]);
 
@@ -297,8 +309,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       return diffA - diffB;
     });
 
+  const [codeCopied, setCodeCopied] = useState(false);
+
+  const handleCopyCode = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(room.code);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    }
+  };
+
   return (
-    <div className="min-h-screen select-none bg-[url('/background.png')] bg-cover bg-center bg-no-repeat bg-fixed text-white flex flex-col justify-between overflow-hidden relative">
+    <div className="h-screen h-[100dvh] max-h-[100dvh] select-none bg-[url('/background.png')] bg-cover bg-center bg-no-repeat bg-fixed text-white flex flex-col justify-between overflow-hidden relative">
       {/* Ambient Lighting Overlay for Light / Dark side immersion */}
       <div
         className={`absolute inset-0 pointer-events-none transition-colors duration-500 ${
@@ -307,68 +329,79 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       />
 
       {/* TOP HUD BAR */}
-      <header className="relative z-20 w-full max-w-5xl mx-auto px-4 py-3 flex items-center justify-between border-b border-[#2D333B]/80 bg-[#15191F]/75 backdrop-blur-md rounded-b-xl shadow-lg">
+      <header className="relative z-20 w-full max-w-5xl mx-auto px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-between border-b border-[#2D333B]/80 bg-[#15191F]/80 backdrop-blur-md rounded-b-xl shadow-lg pt-[max(0.5rem,env(safe-area-inset-top,0px))]">
         {/* Room Info & Side Indicator */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           <div
-            className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold uppercase tracking-wider ${isLight
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 rounded text-[10px] sm:text-xs font-bold uppercase tracking-wider ${isLight
                 ? 'bg-[#FFCC00] text-[#15191F]'
                 : 'bg-[#2D333B] text-white border border-[#404752]'
               }`}
           >
-            <FlipHorizontal className="w-3.5 h-3.5" />
-            <span>{isLight ? 'Light Side' : 'Dark Side'}</span>
+            <FlipHorizontal className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+            <span className="hidden xs:inline">{isLight ? 'Light Side' : 'Dark Side'}</span>
+            <span className="xs:hidden">{isLight ? 'Light' : 'Dark'}</span>
           </div>
 
-          <div className="text-xs font-mono font-medium text-[#9BA3AF] bg-[#1E232B] px-3 py-1 rounded border border-[#2D333B]">
-            Room: <span className="text-white font-bold">{room.code}</span>
-          </div>
+          <button
+            onClick={handleCopyCode}
+            className="flex items-center gap-1 text-[10px] sm:text-xs font-mono font-medium text-[#9BA3AF] bg-[#1E232B] px-2 sm:px-3 py-1 rounded border border-[#2D333B] hover:text-white active:scale-95 transition-all touch-manipulation cursor-pointer"
+            title="Click to copy room code"
+          >
+            <span className="text-[#9BA3AF] hidden xs:inline">Room:</span>
+            <span className="text-white font-bold">{room.code}</span>
+            {codeCopied && (
+              <span className="text-[#27AE60] text-[9px] font-bold uppercase tracking-wider ml-0.5">
+                Copied!
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Action Banner / Turn Banner */}
-        <div className="flex items-center">
+        <div className="flex items-center px-1">
           <div
-            className={`px-4 py-1.5 rounded text-xs font-bold flex items-center gap-2 transition-all ${isMyTurn
+            className={`px-2.5 sm:px-4 py-1 sm:py-1.5 rounded text-[10px] sm:text-xs font-bold flex items-center gap-1.5 transition-all max-w-[120px] xs:max-w-[170px] sm:max-w-none truncate ${isMyTurn
                 ? 'bg-[#FFCC00] text-[#15191F]'
                 : 'bg-[#1E232B] text-[#9BA3AF] border border-[#2D333B]'
               }`}
           >
-            <Clock className="w-3.5 h-3.5" />
-            <span>{activePlayerName}</span>
+            <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+            <span className="truncate">{activePlayerName}</span>
           </div>
         </div>
 
         {/* Sound, Rules & Exit */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           {/* Sound Mute Toggle Button */}
           <button
             onClick={() => {
               const next = toggleSoundMuted();
               setSoundMutedState(next);
             }}
-            className="p-2 rounded bg-[#1E232B] hover:bg-[#252B35] border border-[#2D333B] text-[#9BA3AF] hover:text-white transition-colors cursor-pointer"
+            className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-1.5 sm:p-2 rounded bg-[#1E232B] hover:bg-[#252B35] active:scale-95 border border-[#2D333B] text-[#9BA3AF] hover:text-white transition-all cursor-pointer flex items-center justify-center touch-manipulation"
             title={soundMuted ? 'Unmute Sound' : 'Mute Sound'}
           >
             {soundMuted ? (
-              <VolumeX className="w-4 h-4 text-[#ED1C24]" />
+              <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#ED1C24]" />
             ) : (
-              <Volume2 className="w-4 h-4 text-[#27AE60]" />
+              <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#27AE60]" />
             )}
           </button>
 
           <button
             onClick={() => setShowRules(true)}
-            className="p-2 rounded bg-[#1E232B] hover:bg-[#252B35] border border-[#2D333B] text-[#9BA3AF] hover:text-white transition-colors cursor-pointer"
+            className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-1.5 sm:p-2 rounded bg-[#1E232B] hover:bg-[#252B35] active:scale-95 border border-[#2D333B] text-[#9BA3AF] hover:text-white transition-all cursor-pointer flex items-center justify-center touch-manipulation"
             title="Rules"
           >
-            <HelpCircle className="w-4 h-4 text-[#FFCC00]" />
+            <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FFCC00]" />
           </button>
           <button
             onClick={() => setShowLeaveConfirm(true)}
-            className="p-2 rounded bg-[#1E232B] hover:bg-red-950/40 border border-[#2D333B] hover:border-[#ED1C24]/50 text-[#9BA3AF] hover:text-[#ED1C24] transition-colors cursor-pointer"
+            className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-1.5 sm:p-2 rounded bg-[#1E232B] hover:bg-red-950/40 active:scale-95 border border-[#2D333B] hover:border-[#ED1C24]/50 text-[#9BA3AF] hover:text-[#ED1C24] transition-all cursor-pointer flex items-center justify-center touch-manipulation"
             title="Leave Game"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
         </div>
       </header>
@@ -404,11 +437,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* MAIN GAME TABLE (GSAP Ref) */}
       <main
         ref={boardRef}
-        className="relative z-10 flex-1 flex flex-col items-center justify-center max-w-5xl mx-auto w-full px-2"
+        className="relative z-10 flex-1 flex flex-col items-center justify-center max-w-5xl mx-auto w-full px-1 xs:px-2 min-h-0"
         style={{ transformStyle: 'preserve-3d' }}
       >
         {/* Opponents Row (Top / Sides) */}
-        <div className="w-full flex items-center justify-around mb-4 sm:mb-8">
+        <div className="w-full flex items-center justify-around mb-2 xs:mb-3 sm:mb-6 max-w-3xl px-1">
           {opponents.map((opponent, idx) => (
             <OpponentSeat
               key={opponent.id}
@@ -431,20 +464,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         </div>
 
         {/* Central Arena: Direction Ring, Discard Pile, Draw Pile */}
-        <div className="relative flex items-center justify-center gap-6 sm:gap-10 p-6 sm:p-8 rounded-2xl bg-[#1E232B]/85 backdrop-blur-md border border-[#2D333B]/80 shadow-2xl">
+        <div className="relative flex items-center justify-center gap-3 xs:gap-6 sm:gap-10 p-2.5 xs:p-4 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl bg-[#1E232B]/85 backdrop-blur-md border border-[#2D333B]/80 shadow-2xl">
           {/* Direction Indicator Widget */}
           <div
-            className="absolute -top-3 flex items-center gap-1.5 px-3 py-0.5 rounded bg-[#15191F] border border-[#2D333B] text-[11px] font-bold text-[#9BA3AF]"
+            className="absolute -top-3 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-0.5 rounded bg-[#15191F] border border-[#2D333B] text-[10px] sm:text-[11px] font-bold text-[#9BA3AF]"
             title={`Direction: ${room.direction === 1 ? 'Clockwise' : 'Counter-Clockwise'}`}
           >
             {room.direction === 1 ? (
               <>
-                <RotateCw className="w-3 h-3 text-[#1677E8]" />
+                <RotateCw className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-[#1677E8]" />
                 <span>Clockwise</span>
               </>
             ) : (
               <>
-                <RotateCcw className="w-3 h-3 text-[#ED1C24]" />
+                <RotateCcw className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-[#ED1C24]" />
                 <span>Counter-Clockwise</span>
               </>
             )}
@@ -452,8 +485,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
           {/* Active Penalty Stack Badge */}
           {(room.draw_penalty || 0) > 0 && (
-            <div className="absolute -top-3.5 right-4 flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#ED1C24] text-white text-[11px] font-black uppercase tracking-wider shadow-lg animate-pulse ring-2 ring-[#ED1C24]/50">
-              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+            <div className="absolute -top-3.5 right-2 sm:right-4 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-0.5 rounded-full bg-[#ED1C24] text-white text-[9px] sm:text-[11px] font-black uppercase tracking-wider shadow-lg animate-pulse ring-2 ring-[#ED1C24]/50">
+              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white animate-ping" />
               <span>STACK: +{room.draw_penalty} CARDS</span>
             </div>
           )}
@@ -477,10 +510,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
         {/* Turn Prompt Hint & Synchronized Turn Countdown */}
         {room.status === 'playing' && (
-          <div className="mt-3 flex flex-col sm:flex-row items-center gap-2">
+          <div className="mt-1.5 xs:mt-2 sm:mt-3 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 px-2 text-center max-w-full">
             {room.pending_draw_decision ? (
-              <div className="px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase flex items-center gap-1.5 bg-[#1E232B] border border-[#FFCC00]/40 text-[#FFCC00] shadow-md">
-                <Clock className="w-3.5 h-3.5 animate-pulse" />
+              <div className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black tracking-wider uppercase flex items-center gap-1.5 bg-[#1E232B] border border-[#FFCC00]/40 text-[#FFCC00] shadow-md">
+                <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-pulse" />
                 <span>
                   {room.pending_draw_decision.player_id === me?.profile_id
                     ? 'DECISION PENDING'
@@ -490,7 +523,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             ) : (
               turnSecondsLeft !== null && (
                 <div
-                  className={`px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase flex items-center gap-1.5 transition-all shadow-md ${
+                  className={`px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black tracking-wider uppercase flex items-center gap-1.5 transition-all shadow-md ${
                     turnSecondsLeft <= 5
                       ? 'bg-[#ED1C24] text-white animate-pulse ring-2 ring-[#ED1C24]/60'
                       : turnSecondsLeft <= 10
@@ -498,21 +531,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       : 'bg-[#15191F] border border-[#2D333B] text-[#FFCC00]'
                   }`}
                 >
-                  <Clock className="w-3.5 h-3.5" />
+                  <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   <span>TURN: {turnSecondsLeft}s</span>
                 </div>
               )
             )}
 
             {isMyTurn && !room.pending_draw_decision && (
-              <div className="text-xs sm:text-sm font-bold tracking-wide flex items-center gap-1.5">
+              <div className="text-[11px] sm:text-sm font-bold tracking-wide flex items-center gap-1.5">
                 {(room.draw_penalty || 0) > 0 ? (
                   <span className="text-[#FF8080] font-black animate-pulse">
-                    🔥 PENALTY ACTIVE: Stack equal or higher penalty card (+{room.draw_penalty} pending) or draw!
+                    🔥 PENALTY ACTIVE: Stack penalty (+{room.draw_penalty}) or draw!
                   </span>
                 ) : (
                   <span className="text-[#FFCC00]">
-                    YOUR TURN: Play a matching card or draw from the deck
+                    YOUR TURN: Play a matching card or draw
                   </span>
                 )}
               </div>
@@ -522,7 +555,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       </main>
 
       {/* BOTTOM HUD: Player Hand */}
-      <footer className="relative z-20 w-full max-w-5xl mx-auto pb-4 sm:pb-6 px-2 flex flex-col items-center">
+      <footer className="relative z-20 w-full max-w-5xl mx-auto pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] px-1 xs:px-2 flex flex-col items-center shrink-0">
         <PlayerHand
           cards={myHand}
           activeSide={room.current_side}
@@ -620,10 +653,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               Are you sure you want to leave? If you forfeit, the remaining player(s) will continue or win immediately.
             </p>
 
-            <div className="flex gap-2 w-full mt-6">
+            <div className="flex gap-2 w-full mt-5 sm:mt-6">
               <button
                 onClick={() => setShowLeaveConfirm(false)}
-                className="flex-1 py-2.5 px-3 rounded-lg font-medium text-xs text-[#9BA3AF] border border-[#2D333B] hover:bg-[#15191F] hover:text-white transition-colors cursor-pointer"
+                className="flex-1 min-h-[44px] py-2.5 px-3 rounded-lg font-medium text-xs text-[#9BA3AF] border border-[#2D333B] hover:bg-[#15191F] hover:text-white active:scale-95 transition-all flex items-center justify-center cursor-pointer touch-manipulation"
               >
                 Stay in Game
               </button>
@@ -632,7 +665,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   setShowLeaveConfirm(false);
                   await onLeaveRoom();
                 }}
-                className="flex-1 py-2.5 px-3 rounded-lg font-bold text-xs uppercase tracking-wider bg-[#ED1C24] hover:bg-[#D3141B] text-white transition-colors cursor-pointer shadow-sm"
+                className="flex-1 min-h-[44px] py-2.5 px-3 rounded-lg font-bold text-xs uppercase tracking-wider bg-[#ED1C24] hover:bg-[#D3141B] active:scale-95 text-white transition-all flex items-center justify-center cursor-pointer shadow-sm touch-manipulation"
               >
                 Forfeit & Leave
               </button>

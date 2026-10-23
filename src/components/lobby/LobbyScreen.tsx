@@ -77,11 +77,11 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-[url('/background.png')] bg-cover bg-center bg-no-repeat bg-fixed text-white flex flex-col justify-between p-4 sm:p-6 relative">
+    <div className="min-h-screen bg-[url('/background.png')] bg-cover bg-center bg-no-repeat bg-fixed text-white flex flex-col justify-between p-3 sm:p-6 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] relative">
       <div className="absolute inset-0 bg-black/35 pointer-events-none" />
 
       {/* Top Navbar */}
-      <header className="relative z-10 w-full max-w-3xl mx-auto flex items-center justify-between border border-[#2D333B]/80 bg-[#15191F]/75 backdrop-blur-md px-4 py-2.5 rounded-xl shadow-lg">
+      <header className="relative z-10 w-full max-w-3xl mx-auto flex items-center justify-between border border-[#2D333B]/80 bg-[#15191F]/75 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-xl shadow-lg">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded bg-[#ED1C24] text-white flex items-center justify-center font-bold text-xs">
             UF
@@ -93,17 +93,17 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             onClick={onOpenHowToPlay}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#2D333B] text-xs text-[#9BA3AF] hover:text-white hover:bg-[#1E232B] transition-colors"
+            className="min-h-[36px] sm:min-h-[40px] flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-[#2D333B] text-xs text-[#9BA3AF] hover:text-white hover:bg-[#1E232B] active:scale-95 transition-all touch-manipulation cursor-pointer"
           >
             <HelpCircle className="w-3.5 h-3.5 text-[#FFCC00]" />
             <span>Rules</span>
           </button>
           <button
             onClick={onLeaveRoom}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#2D333B] text-xs text-[#9BA3AF] hover:text-[#ED1C24] hover:bg-[#1E232B] transition-colors"
+            className="min-h-[36px] sm:min-h-[40px] flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-[#2D333B] text-xs text-[#9BA3AF] hover:text-[#ED1C24] hover:bg-[#1E232B] active:scale-95 transition-all touch-manipulation cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Leave</span>
@@ -112,9 +112,9 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
       </header>
 
       {/* Main Content */}
-      <main className="relative z-10 w-full max-w-2xl mx-auto my-auto flex flex-col items-center">
+      <main className="relative z-10 w-full max-w-2xl mx-auto my-auto flex flex-col items-center px-1">
         {/* Room Code Banner */}
-        <div className="w-full rounded-2xl bg-[#1E232B]/90 backdrop-blur-md border border-[#2D333B]/80 p-5 sm:p-6 mb-5 text-center flex flex-col items-center shadow-2xl">
+        <div className="w-full rounded-2xl bg-[#1E232B]/90 backdrop-blur-md border border-[#2D333B]/80 p-4 sm:p-6 mb-4 sm:mb-5 text-center flex flex-col items-center shadow-2xl">
           <span className="text-xs text-[#9BA3AF] uppercase tracking-wider font-medium">
             Room Code
           </span>
@@ -126,7 +126,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             <button
               onClick={copyRoomCode}
               title="Copy code"
-              className="p-2 rounded-lg border border-[#2D333B] text-[#9BA3AF] hover:text-white hover:bg-[#15191F] transition-colors"
+              className="min-w-[44px] min-h-[44px] p-2 rounded-lg border border-[#2D333B] text-[#9BA3AF] hover:text-white hover:bg-[#15191F] active:scale-95 transition-all flex items-center justify-center touch-manipulation cursor-pointer"
             >
               {copied ? <Check className="w-4 h-4 text-[#27AE60]" /> : <Copy className="w-4 h-4" />}
             </button>
@@ -134,10 +134,10 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
           <button
             onClick={shareInviteLink}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium text-[#9BA3AF] hover:text-white transition-colors"
+            className="min-h-[40px] flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-[#9BA3AF] hover:text-white active:scale-95 transition-all touch-manipulation cursor-pointer"
           >
             <Share2 className="w-3.5 h-3.5 text-[#FFCC00]" />
-            <span>{copied ? 'Link Copied' : 'Share invite link'}</span>
+            <span>{copied ? 'Link Copied!' : 'Share invite link'}</span>
           </button>
         </div>
 
@@ -260,9 +260,9 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             <button
               onClick={onStartGame}
               disabled={!canStart}
-              className={`w-full py-3 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
+              className={`w-full min-h-[48px] py-3 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all touch-manipulation ${
                 canStart
-                  ? 'bg-[#FFCC00] text-[#15191F] hover:bg-[#E6B800] cursor-pointer'
+                  ? 'bg-[#FFCC00] text-[#15191F] hover:bg-[#E6B800] active:scale-95 cursor-pointer shadow-md'
                   : 'bg-[#1E232B] text-[#9BA3AF] border border-[#2D333B] cursor-not-allowed'
               }`}
             >
@@ -272,7 +272,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           ) : (
             <button
               onClick={() => onToggleReady(!me?.is_ready)}
-              className={`w-full py-3 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors cursor-pointer ${
+              className={`w-full min-h-[48px] py-3 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer touch-manipulation active:scale-95 ${
                 me?.is_ready
                   ? 'bg-[#27AE60] text-white hover:bg-[#219653]'
                   : 'bg-[#FFCC00] text-[#15191F] hover:bg-[#E6B800]'

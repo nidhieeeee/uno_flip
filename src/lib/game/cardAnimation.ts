@@ -67,17 +67,23 @@ export function launchCardPlayOverlay(
 
   document.body.appendChild(overlay);
 
+  const isReducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   const dx = discardRect.left + discardRect.width / 2 - (cardRect.left + cardRect.width / 2);
   const dy = discardRect.top + discardRect.height / 2 - (cardRect.top + cardRect.height / 2);
   const targetScale = Math.min(1.15, discardRect.width / Math.max(1, cardRect.width));
-  const rotation = ((cardId.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % 15) - 7);
+  const rotation = isReducedMotion
+    ? 0
+    : (cardId.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % 15) - 7;
 
   gsap.to(overlay, {
     x: dx,
     y: dy,
     scale: targetScale,
     rotation,
-    duration: 0.22, // 220ms snappy travel
+    duration: isReducedMotion ? 0.05 : 0.22, // instant/subtle if reduced motion, else 220ms snappy travel
     ease: 'power2.out',
     onComplete: () => {
       activeFlyingCardIds.delete(cardId);

@@ -106,11 +106,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[url('/background.png')] bg-cover bg-center bg-no-repeat bg-fixed text-white flex flex-col justify-between p-4 sm:p-6 relative">
+    <div className="min-h-screen bg-[url('/background.png')] bg-cover bg-center bg-no-repeat bg-fixed text-white flex flex-col justify-between p-3 sm:p-6 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] relative">
       <div className="absolute inset-0 bg-black/35 pointer-events-none" />
 
       {/* Top Header */}
-      <header className="relative z-10 w-full max-w-3xl mx-auto flex items-center justify-between border border-[#2D333B]/80 bg-[#15191F]/75 backdrop-blur-md px-4 py-2.5 rounded-xl shadow-lg">
+      <header className="relative z-10 w-full max-w-3xl mx-auto flex items-center justify-between border border-[#2D333B]/80 bg-[#15191F]/75 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-xl shadow-lg">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded bg-[#ED1C24] text-white flex items-center justify-center font-bold text-xs">
             UF
@@ -120,7 +120,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         <button
           onClick={() => setShowRules(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#2D333B] text-xs font-medium text-[#9BA3AF] hover:text-white hover:bg-[#1E232B] transition-colors"
+          className="min-h-[40px] flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#2D333B] text-xs font-medium text-[#9BA3AF] hover:text-white hover:bg-[#1E232B] active:scale-95 transition-all touch-manipulation cursor-pointer"
         >
           <HelpCircle className="w-3.5 h-3.5 text-[#FFCC00]" />
           <span>Rules</span>
@@ -128,19 +128,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       </header>
 
       {/* Main Card Container */}
-      <main className="relative z-10 w-full max-w-md mx-auto my-auto flex flex-col items-center">
+      <main className="relative z-10 w-full max-w-md mx-auto my-auto flex flex-col items-center px-1">
         {/* Title & Description */}
-        <div className="text-center mb-6">
+        <div className="text-center mb-5 sm:mb-6">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-1">
             UNO FLIP Online
           </h1>
-          <p className="text-xs text-[#9BA3AF]">
+          <p className="text-xs text-[#9BA3AF] max-w-xs mx-auto">
             Multiplayer card game with Light and Dark sides. Play in real-time from any device.
           </p>
         </div>
 
         {/* Action Panel */}
-        <div className="w-full bg-[#1E232B]/90 backdrop-blur-md border border-[#2D333B]/80 rounded-2xl p-5 sm:p-6 shadow-2xl">
+        <div className="w-full bg-[#1E232B]/90 backdrop-blur-md border border-[#2D333B]/80 rounded-2xl p-4 sm:p-6 shadow-2xl">
           {/* Player Nickname Field */}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-1.5">
@@ -162,7 +162,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               onBlur={saveNickname}
               placeholder="Enter nickname..."
               maxLength={18}
-              className="w-full px-3 py-2 rounded-lg bg-[#15191F] border border-[#2D333B] text-white text-xs font-medium focus:outline-none focus:border-[#FFCC00] transition-colors"
+              className="w-full min-h-[44px] px-3 py-2 rounded-lg bg-[#15191F] border border-[#2D333B] text-white text-xs sm:text-sm font-medium focus:outline-none focus:border-[#FFCC00] transition-colors"
             />
           </div>
 
@@ -176,7 +176,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <button
             onClick={handleCreateRoom}
             disabled={isLoading}
-            className="w-full py-2.5 px-4 rounded-lg bg-[#FFCC00] text-[#15191F] font-bold text-xs uppercase tracking-wider hover:bg-[#E6B800] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mb-3"
+            className="w-full min-h-[44px] py-2.5 px-4 rounded-lg bg-[#FFCC00] text-[#15191F] font-bold text-xs uppercase tracking-wider hover:bg-[#E6B800] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mb-3 touch-manipulation"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>{isLoading ? 'Creating...' : 'Create New Room'}</span>
@@ -197,12 +197,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               onChange={(e) => setCustomJoinCode(e.target.value.toUpperCase())}
               placeholder="ROOM CODE"
               maxLength={8}
-              className="flex-1 px-3 py-2 rounded-lg bg-[#15191F] border border-[#2D333B] text-center font-mono font-bold text-xs tracking-wider text-[#FFCC00] uppercase placeholder:text-[#9BA3AF]/40 focus:outline-none focus:border-[#FFCC00]"
+              className="flex-1 min-h-[44px] px-3 py-2 rounded-lg bg-[#15191F] border border-[#2D333B] text-center font-mono font-bold text-xs sm:text-sm tracking-wider text-[#FFCC00] uppercase placeholder:text-[#9BA3AF]/40 focus:outline-none focus:border-[#FFCC00]"
             />
             <button
               type="submit"
               disabled={isLoading || !joinCode.trim()}
-              className="px-4 py-2 rounded-lg border border-[#2D333B] hover:bg-[#15191F] text-xs font-bold text-white transition-colors flex items-center gap-1.5 disabled:opacity-40 cursor-pointer"
+              className="min-h-[44px] px-4 py-2 rounded-lg border border-[#2D333B] hover:bg-[#15191F] active:scale-95 text-xs font-bold text-white transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 cursor-pointer touch-manipulation"
             >
               <span>Join</span>
               <ArrowRight className="w-3.5 h-3.5" />

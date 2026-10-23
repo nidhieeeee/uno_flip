@@ -110,7 +110,7 @@ const UnoButton: React.FC<{
     <button
       onClick={onClick}
       disabled={buttonDisabled}
-      className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-all ${
+      className={`flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all touch-manipulation active:scale-95 ${
         hasCalledUno || justCalledUno
           ? 'bg-[#27AE60] text-white border border-[#27AE60] shadow-sm cursor-default'
           : isUnoVulnerable
@@ -293,7 +293,11 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
       }
     });
 
-    // 4. Smoothly slide existing cards into their new layout slots (160ms, snappy power2.out)
+    const isReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // 4. Smoothly slide existing cards into their new layout slots
     cards.forEach((c) => {
       if (newlyAddedIdSet.has(c.id)) return;
       const el = cardElementsRef.current.get(c.id);
@@ -312,7 +316,7 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
             {
               x: 0,
               y: 0,
-              duration: 0.16,
+              duration: isReducedMotion ? 0.01 : 0.16,
               ease: 'power2.out',
               clearProps: 'transform',
             }
@@ -322,7 +326,6 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
     });
 
     // 5. Animate newly drawn cards (from draw pile #deck-pile-container)
-    // Snappy entrance (220ms, power2.out, max 30ms stagger)
     const deckEl = typeof document !== 'undefined' ? document.getElementById('deck-pile-container') : null;
     const deckRect = deckEl ? deckEl.getBoundingClientRect() : null;
 
@@ -331,7 +334,7 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
       const newRect = restingPositions.get(c.id);
       if (!el || !newRect) return;
 
-      const delay = Math.min(0.12, index * 0.03);
+      const delay = isReducedMotion ? 0 : Math.min(0.12, index * 0.03);
 
       if (deckRect) {
         const dx = deckRect.left + deckRect.width / 2 - (newRect.left + newRect.width / 2);
@@ -345,7 +348,7 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
             y: dy,
             scale,
             opacity: 0.85,
-            rotation: -5,
+            rotation: isReducedMotion ? 0 : -5,
           },
           {
             x: 0,
@@ -354,7 +357,7 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
             opacity: 1,
             rotation: 0,
             delay,
-            duration: 0.22,
+            duration: isReducedMotion ? 0.01 : 0.22,
             ease: 'power2.out',
             clearProps: 'transform,opacity',
           }
@@ -368,7 +371,7 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
             opacity: 1,
             scale: 1,
             delay,
-            duration: 0.2,
+            duration: isReducedMotion ? 0.01 : 0.2,
             ease: 'power2.out',
             clearProps: 'transform,opacity',
           }
@@ -459,7 +462,7 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
         {/* Peek Other Side Toggle Button */}
         <button
           onClick={() => setPeekOtherSide((prev) => !prev)}
-          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+          className={`flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-lg text-xs font-medium border transition-colors cursor-pointer touch-manipulation active:scale-95 ${
             peekOtherSide
               ? 'bg-[#1E232B] border-[#FFCC00] text-[#FFCC00]'
               : 'bg-[#1E232B] border-[#2D333B] text-[#9BA3AF] hover:text-white'
@@ -473,7 +476,7 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
       {/* Responsive, Animated Cards Container: No Horizontal Scrollbar */}
       <div
         ref={containerRef}
-        className="w-full max-w-4xl px-2 py-1 flex justify-center items-end min-h-[135px] sm:min-h-[165px] overflow-visible"
+        className="w-full max-w-4xl px-1 sm:px-2 py-1 flex justify-center items-end min-h-[105px] xs:min-h-[125px] sm:min-h-[165px] overflow-visible"
       >
         <div
           className="flex items-end justify-center"

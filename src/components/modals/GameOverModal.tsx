@@ -41,15 +41,15 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   const sortedPlayers = [...players].sort((a, b) => a.card_count - b.card_count);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
-      <div className="relative w-full max-w-sm rounded-xl bg-[#1E232B] border border-[#2D333B] p-6 shadow-xl flex flex-col items-center text-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70">
+      <div className="relative w-full max-w-sm max-h-[90dvh] overflow-y-auto rounded-xl bg-[#1E232B] border border-[#2D333B] p-5 sm:p-6 shadow-xl flex flex-col items-center text-center">
         {/* Trophy Icon */}
-        <div className="w-12 h-12 rounded-full bg-[#FFCC00] text-[#15191F] flex items-center justify-center mb-3">
-          <Trophy className="w-6 h-6 fill-current" />
+        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#FFCC00] text-[#15191F] flex items-center justify-center mb-2.5 sm:mb-3">
+          <Trophy className="w-5 h-5 sm:w-6 sm:h-6 fill-current" />
         </div>
 
         {/* Victory Header */}
-        <h2 className="text-xl font-bold text-white">
+        <h2 className="text-lg sm:text-xl font-bold text-white">
           {isMeWinner ? 'You Won!' : `${winner?.profile?.nickname || 'Player'} Won!`}
         </h2>
         {room.win_reason === 'forfeit' && (
@@ -57,14 +57,14 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             Player Forfeit
           </span>
         )}
-        <p className="text-[#9BA3AF] text-xs mt-1.5">
+        <p className="text-[#9BA3AF] text-xs mt-1 sm:mt-1.5">
           {room.win_reason === 'forfeit'
             ? room.last_action?.message || (isMeWinner ? 'Opponent left the game. You win!' : 'Match ended by forfeit.')
             : 'Game over. Final standings:'}
         </p>
 
         {/* Final Standings List */}
-        <div className="w-full mt-4 bg-[#15191F] rounded-lg p-3 border border-[#2D333B] flex flex-col gap-2">
+        <div className="w-full mt-3 sm:mt-4 bg-[#15191F] rounded-lg p-2.5 sm:p-3 border border-[#2D333B] flex flex-col gap-1.5 sm:gap-2">
           {sortedPlayers.map((player, idx) => {
             const isWinnerItem = idx === 0;
             return (
@@ -92,11 +92,11 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           })}
         </div>
 
-        {/* Action Buttons: Simple Yellow Primary and Outlined Secondary */}
-        <div className="flex flex-col gap-2 w-full mt-5">
+        {/* Action Buttons: 44px min touch targets */}
+        <div className="flex flex-col gap-2 w-full mt-4 sm:mt-5">
           <button
             onClick={onRematch}
-            className="w-full py-2.5 px-4 rounded-lg font-bold text-xs uppercase tracking-wider bg-[#FFCC00] text-[#15191F] hover:bg-[#E6B800] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full min-h-[44px] py-2.5 px-4 rounded-lg font-bold text-xs uppercase tracking-wider bg-[#FFCC00] text-[#15191F] hover:bg-[#E6B800] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer touch-manipulation"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Play Again</span>
@@ -104,7 +104,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
           <button
             onClick={onReturnLobby}
-            className="w-full py-2.5 px-4 rounded-lg font-medium text-xs text-[#9BA3AF] border border-[#2D333B] hover:bg-[#15191F] hover:text-white transition-colors cursor-pointer"
+            className="w-full min-h-[44px] py-2.5 px-4 rounded-lg font-medium text-xs text-[#9BA3AF] border border-[#2D333B] hover:bg-[#15191F] hover:text-white active:scale-95 transition-all flex items-center justify-center cursor-pointer touch-manipulation"
           >
             Exit to Home
           </button>

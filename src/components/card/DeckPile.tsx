@@ -28,18 +28,18 @@ export const DeckPile: React.FC<DeckPileProps> = ({
     <div id="deck-pile-container" className="flex flex-col items-center select-none">
       {/* Deck Stack */}
       <div
-        className={`relative cursor-pointer transition-transform duration-150 ${
+        className={`relative cursor-pointer transition-transform duration-150 touch-manipulation ${
           isMyTurn && !disabled ? 'active:scale-95' : 'cursor-default'
         }`}
         onClick={isMyTurn && !disabled ? onDraw : undefined}
       >
         {/* Subtle stack offset edges for 3D card feel without heavy blur */}
-        <div className="absolute top-1.5 left-1.5 w-20 h-28 sm:w-24 sm:h-36 bg-[#111418] rounded-lg border border-[#2D333B]" />
-        <div className="absolute top-0.5 left-0.5 w-20 h-28 sm:w-24 sm:h-36 bg-[#181D24] rounded-lg border border-[#2D333B]" />
+        <div className="absolute top-1.5 left-1.5 w-16 h-22 xs:w-20 xs:h-28 sm:w-24 sm:h-36 bg-[#111418] rounded-lg border border-[#2D333B]" />
+        <div className="absolute top-0.5 left-0.5 w-16 h-22 xs:w-20 xs:h-28 sm:w-24 sm:h-36 bg-[#181D24] rounded-lg border border-[#2D333B]" />
 
         {/* Top Deck Card */}
         <div
-          className={`relative w-20 h-28 sm:w-24 sm:h-36 rounded-lg p-1.5 border transition-all duration-300 ${
+          className={`relative w-16 h-22 xs:w-20 xs:h-28 sm:w-24 sm:h-36 rounded-lg p-1 sm:p-1.5 border transition-all duration-300 ${
             isMyTurn && !disabled
               ? hasPenalty
                 ? 'ring-2 ring-[#ED1C24] border-[#ED1C24] animate-pulse'
@@ -51,7 +51,7 @@ export const DeckPile: React.FC<DeckPileProps> = ({
         >
           {/* Card Face Graphic for Active Side */}
           <div
-            className={`w-full h-full rounded flex flex-col items-center justify-center p-2 border transition-colors duration-300 ${
+            className={`w-full h-full rounded flex flex-col items-center justify-center p-1 sm:p-2 border transition-colors duration-300 ${
               isLight
                 ? 'border-slate-200 bg-[#1E232B] text-white'
                 : 'border-purple-500/40 bg-gradient-to-b from-[#211134] to-[#120B1D] text-white'
@@ -59,19 +59,19 @@ export const DeckPile: React.FC<DeckPileProps> = ({
           >
             {/* Center Brand Oval */}
             <div
-              className={`w-11 h-11 sm:w-14 sm:h-14 rounded-full border flex items-center justify-center transform -rotate-12 transition-transform duration-300 ${
+              className={`w-9 h-9 xs:w-11 xs:h-11 sm:w-14 sm:h-14 rounded-full border flex items-center justify-center transform -rotate-12 transition-transform duration-300 ${
                 isLight
                   ? 'border-white/50 bg-[#1677E8]/20'
                   : 'border-[#D81B60]/70 bg-[#7B1FA2]/30 shadow-inner shadow-purple-500/30'
               }`}
             >
-              <span className="font-black text-xs sm:text-sm tracking-widest uppercase transform rotate-12">
+              <span className="font-black text-[10px] xs:text-xs sm:text-sm tracking-widest uppercase transform rotate-12">
                 UNO
               </span>
             </div>
 
             <div
-              className={`mt-1.5 text-[8px] sm:text-[9px] font-black uppercase tracking-widest ${
+              className={`mt-1 sm:mt-1.5 text-[7px] xs:text-[8px] sm:text-[9px] font-black uppercase tracking-widest ${
                 isLight ? 'text-[#FFCC00]' : 'text-[#00E5FF] drop-shadow'
               }`}
             >

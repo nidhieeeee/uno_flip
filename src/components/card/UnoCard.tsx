@@ -39,9 +39,9 @@ export const UnoCard: React.FC<UnoCardProps> = ({
 
   // Dimension presets when explicit width/height is not provided
   const sizeStyles = {
-    sm: 'w-14 h-20 text-xs rounded-md',
-    md: 'w-20 h-28 sm:w-24 sm:h-36 text-sm sm:text-base rounded-lg',
-    lg: 'w-28 h-40 sm:w-32 sm:h-48 text-base sm:text-lg rounded-xl',
+    sm: 'w-12 h-16 xs:w-14 xs:h-20 text-[10px] xs:text-xs rounded-md',
+    md: 'w-16 h-22 xs:w-20 xs:h-28 sm:w-24 sm:h-36 text-xs sm:text-base rounded-lg',
+    lg: 'w-22 h-32 xs:w-28 xs:h-40 sm:w-32 sm:h-48 text-sm sm:text-lg rounded-xl',
     custom: 'rounded-lg text-xs',
   }[size];
 
@@ -272,9 +272,9 @@ export const UnoCard: React.FC<UnoCardProps> = ({
         ...(typeof height === 'number' ? { height: `${height}px` } : {}),
         ...style,
       }}
-      className={`relative select-none transition-colors duration-150 ${sizeStyles || ''} ${
+      className={`relative select-none transition-colors duration-150 touch-manipulation ${sizeStyles || ''} ${
         isPlayable
-          ? 'cursor-pointer ring-2 ring-[#FFCC00] hover:brightness-105'
+          ? 'cursor-pointer ring-2 ring-[#FFCC00] hover:brightness-105 active:scale-95'
           : 'cursor-default opacity-95'
       } ${className}`}
     >

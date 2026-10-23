@@ -12,12 +12,13 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
-      <div className="relative w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-xl bg-[#1E232B] border border-[#2D333B] p-5 sm:p-6 text-white scrollbar-thin">
-        {/* Close Button */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70">
+      <div className="relative w-full max-w-xl max-h-[85dvh] overflow-y-auto rounded-xl bg-[#1E232B] border border-[#2D333B] p-4 sm:p-6 text-white scrollbar-thin">
+        {/* Close Button with 44px tap target */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-md text-[#9BA3AF] hover:text-white hover:bg-[#15191F] transition-colors"
+          className="absolute top-3 right-3 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-[#9BA3AF] hover:text-white hover:bg-[#15191F] active:scale-95 transition-all touch-manipulation cursor-pointer"
+          title="Close rules"
         >
           <X className="w-5 h-5" />
         </button>
@@ -82,7 +83,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
         {/* Primary Yellow Button */}
         <button
           onClick={onClose}
-          className="mt-5 w-full py-2.5 rounded-lg bg-[#FFCC00] text-[#15191F] font-bold text-xs uppercase tracking-wider hover:bg-[#E6B800] transition-colors cursor-pointer"
+          className="mt-4 sm:mt-5 w-full min-h-[44px] py-2.5 rounded-lg bg-[#FFCC00] text-[#15191F] font-bold text-xs uppercase tracking-wider hover:bg-[#E6B800] active:scale-95 transition-all cursor-pointer touch-manipulation flex items-center justify-center"
         >
           Got It
         </button>

@@ -45,7 +45,7 @@ export const DiscardPile: React.FC<DiscardPileProps> = ({
         {topCard ? (
           <UnoCard card={topCard} side={side} size="md" />
         ) : (
-          <div className="w-20 h-28 sm:w-24 sm:h-36 rounded-lg border-2 border-dashed border-[#2D333B] flex items-center justify-center text-[#9BA3AF] text-xs font-medium">
+          <div className="w-16 h-22 xs:w-20 xs:h-28 sm:w-24 sm:h-36 rounded-lg border-2 border-dashed border-[#2D333B] flex items-center justify-center text-[#9BA3AF] text-xs font-medium">
             Empty
           </div>
         )}
@@ -53,9 +53,9 @@ export const DiscardPile: React.FC<DiscardPileProps> = ({
 
       {/* Active Color Tag */}
       {activeColor && (
-        <div className="mt-2 flex items-center gap-2 px-3 py-1 rounded-md bg-[#1E232B] border border-[#2D333B] text-xs font-semibold text-white">
-          <span className="text-[#9BA3AF] text-[11px] font-normal">Active:</span>
-          <div className={`w-3 h-3 rounded-full ${getColorDot(activeColor)}`} />
+        <div className="mt-1.5 sm:mt-2 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-md bg-[#1E232B] border border-[#2D333B] text-[11px] sm:text-xs font-semibold text-white">
+          <span className="text-[#9BA3AF] text-[10px] sm:text-[11px] font-normal">Active:</span>
+          <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${getColorDot(activeColor)}`} />
           <span className="capitalize">{activeColor}</span>
         </div>
       )}

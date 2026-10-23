@@ -82,4 +82,36 @@ describe('Player Hand Responsive Dynamic Layout & Scaling', () => {
       expect(layout10Tablet.step).toBeLessThanOrEqual(layout10Desktop.step);
     });
   });
+
+  describe('4. Specific Required Viewport Sizes Test Suite', () => {
+    const requiredViewports = [
+      { name: '320px (Small Mobile - iPhone SE 1st)', width: 320, isMobile: true },
+      { name: '375px (Standard Mobile - iPhone 8/SE2)', width: 375, isMobile: true },
+      { name: '390px (Modern Mobile - iPhone 12/13/14)', width: 390, isMobile: true },
+      { name: '430px (Large Mobile - iPhone 14/15 Pro Max)', width: 430, isMobile: true },
+      { name: '768px (Tablet - iPad Mini)', width: 768, isMobile: false },
+      { name: '1366px (Desktop - Standard Laptop)', width: 1366, isMobile: false },
+    ];
+
+    requiredViewports.forEach(({ name, width, isMobile }) => {
+      describe(`Viewport ${name}`, () => {
+        [1, 2, 5, 7, 10, 15, 20].forEach((cardCount) => {
+          it(`correctly lays out ${cardCount} cards on ${width}px without horizontal overflow`, () => {
+            const layout = computeHandLayout(cardCount, width, isMobile);
+
+            // Strict non-overflow requirement
+            expect(layout.totalWidth).toBeLessThanOrEqual(width);
+            expect(layout.cardWidth).toBeGreaterThan(0);
+            expect(layout.cardHeight).toBeGreaterThan(0);
+            expect(layout.cardHeight).toBe(Math.round(layout.cardWidth * 1.42));
+
+            // Selectability: step must not collapse completely to zero when multiple cards exist
+            if (cardCount > 1) {
+              expect(layout.step).toBeGreaterThan(0);
+            }
+          });
+        });
+      });
+    });
+  });
 });

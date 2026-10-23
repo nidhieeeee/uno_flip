@@ -55,12 +55,12 @@ export const ColorPickerModal: React.FC<ColorPickerModalProps> = ({
         </p>
 
         {/* 2x2 Grid of Color Choices */}
-        <div className="grid grid-cols-2 gap-3 w-full">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 w-full">
           {colors.map((color) => (
             <button
               key={color}
               onClick={() => onSelectColor(color)}
-              className={`h-16 rounded-lg font-bold text-sm uppercase tracking-wider transition-opacity active:scale-95 border border-white/20 flex items-center justify-center cursor-pointer ${getColorButtonStyles(
+              className={`min-h-[52px] h-14 sm:h-16 rounded-lg font-bold text-xs sm:text-sm uppercase tracking-wider transition-all active:scale-95 border border-white/20 flex items-center justify-center cursor-pointer touch-manipulation ${getColorButtonStyles(
                 color
               )}`}
             >
@@ -69,10 +69,10 @@ export const ColorPickerModal: React.FC<ColorPickerModalProps> = ({
           ))}
         </div>
 
-        {/* Cancel Button */}
+        {/* Cancel Button with proper tap target */}
         <button
           onClick={onCancel}
-          className="mt-4 text-xs text-[#9BA3AF] hover:text-white transition-colors"
+          className="mt-3.5 min-h-[44px] px-4 flex items-center justify-center text-xs text-[#9BA3AF] hover:text-white transition-colors touch-manipulation cursor-pointer"
         >
           Cancel
         </button>

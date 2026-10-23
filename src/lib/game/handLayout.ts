@@ -30,8 +30,8 @@ export function computeHandLayout(
   }
 
   // Padding inside container to prevent edge touching
-  const horizontalPadding = isMobile ? 16 : 32;
-  const availableWidth = Math.max(280, containerWidth - horizontalPadding);
+  const horizontalPadding = isMobile ? Math.min(16, Math.max(8, containerWidth * 0.04)) : 32;
+  const availableWidth = Math.min(containerWidth, Math.max(260, containerWidth - horizontalPadding));
 
   // Maximum and minimum card dimensions
   const maxCardWidth = isMobile ? 84 : 112;
@@ -40,7 +40,7 @@ export function computeHandLayout(
 
   // Single card
   if (cardCount === 1) {
-    const cardWidth = maxCardWidth;
+    const cardWidth = Math.min(maxCardWidth, availableWidth);
     const cardHeight = Math.round(cardWidth * aspectRatio);
     return {
       cardWidth,
@@ -54,9 +54,13 @@ export function computeHandLayout(
 
   // Two cards: display them large and clearly with comfortable spacing
   if (cardCount === 2) {
-    const cardWidth = maxCardWidth;
+    let cardWidth = maxCardWidth;
+    let comfortableGap = isMobile ? 12 : 18;
+    if (2 * cardWidth + comfortableGap > availableWidth) {
+      comfortableGap = isMobile ? 8 : 10;
+      cardWidth = Math.min(maxCardWidth, Math.floor((availableWidth - comfortableGap) / 2));
+    }
     const cardHeight = Math.round(cardWidth * aspectRatio);
-    const comfortableGap = isMobile ? 12 : 18;
     const totalWidth = 2 * cardWidth + comfortableGap;
     return {
       cardWidth,
