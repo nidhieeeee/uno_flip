@@ -106,9 +106,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#15191F] text-white flex flex-col justify-between p-4 sm:p-6">
+    <div className="min-h-screen bg-[url('/background.png')] bg-cover bg-center bg-no-repeat bg-fixed text-white flex flex-col justify-between p-4 sm:p-6 relative">
+      <div className="absolute inset-0 bg-black/35 pointer-events-none" />
+
       {/* Top Header */}
-      <header className="w-full max-w-3xl mx-auto flex items-center justify-between border-b border-[#2D333B] pb-3">
+      <header className="relative z-10 w-full max-w-3xl mx-auto flex items-center justify-between border border-[#2D333B]/80 bg-[#15191F]/75 backdrop-blur-md px-4 py-2.5 rounded-xl shadow-lg">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded bg-[#ED1C24] text-white flex items-center justify-center font-bold text-xs">
             UF
@@ -126,7 +128,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       </header>
 
       {/* Main Card Container */}
-      <main className="w-full max-w-md mx-auto my-auto flex flex-col items-center">
+      <main className="relative z-10 w-full max-w-md mx-auto my-auto flex flex-col items-center">
         {/* Title & Description */}
         <div className="text-center mb-6">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-1">
@@ -138,7 +140,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
 
         {/* Action Panel */}
-        <div className="w-full bg-[#1E232B] border border-[#2D333B] rounded-xl p-5 sm:p-6 shadow-sm">
+        <div className="w-full bg-[#1E232B]/90 backdrop-blur-md border border-[#2D333B]/80 rounded-2xl p-5 sm:p-6 shadow-2xl">
           {/* Player Nickname Field */}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-1.5">

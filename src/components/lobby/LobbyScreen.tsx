@@ -77,9 +77,11 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-[#15191F] text-white flex flex-col justify-between p-4 sm:p-6">
+    <div className="min-h-screen bg-[url('/background.png')] bg-cover bg-center bg-no-repeat bg-fixed text-white flex flex-col justify-between p-4 sm:p-6 relative">
+      <div className="absolute inset-0 bg-black/35 pointer-events-none" />
+
       {/* Top Navbar */}
-      <header className="w-full max-w-3xl mx-auto flex items-center justify-between border-b border-[#2D333B] pb-3">
+      <header className="relative z-10 w-full max-w-3xl mx-auto flex items-center justify-between border border-[#2D333B]/80 bg-[#15191F]/75 backdrop-blur-md px-4 py-2.5 rounded-xl shadow-lg">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded bg-[#ED1C24] text-white flex items-center justify-center font-bold text-xs">
             UF
@@ -110,9 +112,9 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
       </header>
 
       {/* Main Content */}
-      <main className="w-full max-w-2xl mx-auto my-auto flex flex-col items-center">
+      <main className="relative z-10 w-full max-w-2xl mx-auto my-auto flex flex-col items-center">
         {/* Room Code Banner */}
-        <div className="w-full rounded-xl bg-[#1E232B] border border-[#2D333B] p-5 sm:p-6 mb-5 text-center flex flex-col items-center">
+        <div className="w-full rounded-2xl bg-[#1E232B]/90 backdrop-blur-md border border-[#2D333B]/80 p-5 sm:p-6 mb-5 text-center flex flex-col items-center shadow-2xl">
           <span className="text-xs text-[#9BA3AF] uppercase tracking-wider font-medium">
             Room Code
           </span>

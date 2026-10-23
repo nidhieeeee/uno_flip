@@ -73,11 +73,12 @@ function UnoFlipGame() {
   // Loading state
   if (isLoading && !room) {
     return (
-      <div className="min-h-screen bg-[#15191F] text-white flex flex-col items-center justify-center p-4">
-        <div className="w-14 h-14 rounded-lg bg-[#ED1C24] border-2 border-white flex items-center justify-center mb-4 shadow-sm">
+      <div className="min-h-screen bg-[url('/background.png')] bg-cover bg-center bg-no-repeat bg-fixed text-white flex flex-col items-center justify-center p-4 relative">
+        <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+        <div className="relative z-10 w-14 h-14 rounded-xl bg-[#ED1C24] border-2 border-white flex items-center justify-center mb-4 shadow-xl">
           <span className="font-bold text-lg text-white">UF</span>
         </div>
-        <div className="flex items-center gap-2 text-[#9BA3AF] font-medium text-sm">
+        <div className="relative z-10 flex items-center gap-2 text-[#9BA3AF] font-medium text-sm bg-[#1E232B]/80 backdrop-blur-md px-4 py-2 rounded-lg border border-[#2D333B]">
           <Loader2 className="w-4 h-4 animate-spin text-[#FFCC00]" />
           <span>Connecting to Room {activeRoomCode}...</span>
         </div>
@@ -88,9 +89,10 @@ function UnoFlipGame() {
   // Error state
   if (error || !room) {
     return (
-      <div className="min-h-screen bg-[#15191F] text-white flex flex-col items-center justify-center p-4 text-center">
-        <div className="max-w-md w-full bg-[#1E232B] border border-[#2D333B] p-6 sm:p-8 rounded-xl flex flex-col items-center">
-          <div className="w-12 h-12 rounded bg-red-950/40 border border-[#ED1C24]/40 text-[#ED1C24] flex items-center justify-center font-bold text-lg mb-3">
+      <div className="min-h-screen bg-[url('/background.png')] bg-cover bg-center bg-no-repeat bg-fixed text-white flex flex-col items-center justify-center p-4 text-center relative">
+        <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+        <div className="relative z-10 max-w-md w-full bg-[#1E232B]/90 backdrop-blur-md border border-[#2D333B] p-6 sm:p-8 rounded-2xl flex flex-col items-center shadow-2xl">
+          <div className="w-12 h-12 rounded-xl bg-red-950/40 border border-[#ED1C24]/40 text-[#ED1C24] flex items-center justify-center font-bold text-lg mb-3">
             !
           </div>
           <h2 className="text-lg font-bold text-white mb-2">Unable to Join Room</h2>
@@ -99,7 +101,7 @@ function UnoFlipGame() {
           </p>
           <button
             onClick={handleLeaveRoom}
-            className="w-full py-2.5 rounded-lg bg-[#FFCC00] text-[#15191F] font-bold text-xs uppercase tracking-wider hover:bg-[#E6B800] transition-colors"
+            className="w-full py-2.5 rounded-lg bg-[#FFCC00] text-[#15191F] font-bold text-xs uppercase tracking-wider hover:bg-[#E6B800] transition-colors cursor-pointer"
           >
             Back to Home
           </button>

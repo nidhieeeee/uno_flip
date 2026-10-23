@@ -298,9 +298,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     });
 
   return (
-    <div className="min-h-screen select-none bg-[#15191F] text-white flex flex-col justify-between overflow-hidden relative">
+    <div className="min-h-screen select-none bg-[url('/background.png')] bg-cover bg-center bg-no-repeat bg-fixed text-white flex flex-col justify-between overflow-hidden relative">
+      {/* Ambient Lighting Overlay for Light / Dark side immersion */}
+      <div
+        className={`absolute inset-0 pointer-events-none transition-colors duration-500 ${
+          isLight ? 'bg-black/20' : 'bg-black/45'
+        }`}
+      />
+
       {/* TOP HUD BAR */}
-      <header className="relative z-20 w-full max-w-5xl mx-auto px-4 py-3 flex items-center justify-between border-b border-[#2D333B]">
+      <header className="relative z-20 w-full max-w-5xl mx-auto px-4 py-3 flex items-center justify-between border-b border-[#2D333B]/80 bg-[#15191F]/75 backdrop-blur-md rounded-b-xl shadow-lg">
         {/* Room Info & Side Indicator */}
         <div className="flex items-center gap-2 sm:gap-3">
           <div
@@ -424,7 +431,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         </div>
 
         {/* Central Arena: Direction Ring, Discard Pile, Draw Pile */}
-        <div className="relative flex items-center justify-center gap-6 sm:gap-10 p-6 sm:p-8 rounded-xl bg-[#1E232B] border border-[#2D333B]">
+        <div className="relative flex items-center justify-center gap-6 sm:gap-10 p-6 sm:p-8 rounded-2xl bg-[#1E232B]/85 backdrop-blur-md border border-[#2D333B]/80 shadow-2xl">
           {/* Direction Indicator Widget */}
           <div
             className="absolute -top-3 flex items-center gap-1.5 px-3 py-0.5 rounded bg-[#15191F] border border-[#2D333B] text-[11px] font-bold text-[#9BA3AF]"
