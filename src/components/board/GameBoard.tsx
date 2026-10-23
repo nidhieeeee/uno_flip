@@ -13,7 +13,11 @@ import { GameOverModal } from '../modals/GameOverModal';
 import { HowToPlayModal } from '../modals/HowToPlayModal';
 import { DrawDecisionModal } from '../modals/DrawDecisionModal';
 import { isSoundMuted, playFlipSound, playPenaltySound, toggleSoundMuted } from '@/lib/audio/sound';
-import { launchCardPlayOverlay } from '@/lib/game/cardAnimation';
+import {
+  launchCardPlayOverlay,
+  launchOpponentPlayOverlay,
+  launchOpponentDrawOverlay,
+} from '@/lib/game/cardAnimation';
 import {
   Clock,
   FlipHorizontal,
@@ -181,15 +185,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
       // Trigger GSAP Flying cards animation
       if (typeof window !== 'undefined') {
-        const deckEl = document.getElementById('deck-pile-container');
         const targetEl = isTargetMe
           ? document.getElementById('player-hand-container')
-          : document.getElementById(`opponent-seat-${targetId}`);
+          : document.getElementById(`opponent-card-stack-${targetId}`) ||
+            document.getElementById(`opponent-seat-${targetId}`);
 
-        if (deckEl && targetEl) {
-          const deckRect = deckEl.getBoundingClientRect();
-          const targetRect = targetEl.getBoundingClientRect();
-
+        if (targetEl) {
           // Shake target area
           gsap.fromTo(
             targetEl,
@@ -197,32 +198,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             { x: 0, duration: 0.45, ease: 'elastic.out(1, 0.3)' }
           );
 
-          // Fly penalty cards from draw pile to opponent seats (player's hand animates the real cards)
+          // Fly penalty cards from draw pile to opponent seat using authentic UNO FLIP card-back
           if (!isTargetMe) {
             const cardCountToFly = Math.min(action.drawnCount || 2, 3);
-            for (let i = 0; i < cardCountToFly; i++) {
-              const flyCard = document.createElement('div');
-              flyCard.className =
-                'fixed z-50 pointer-events-none w-12 h-16 sm:w-16 sm:h-24 rounded-lg bg-[#ED1C24] border-2 border-white shadow-2xl flex items-center justify-center font-black text-sm text-white select-none';
-              flyCard.innerText = '+1';
-              flyCard.style.left = `${deckRect.left + deckRect.width / 2 - 24}px`;
-              flyCard.style.top = `${deckRect.top + deckRect.height / 2 - 32}px`;
-              document.body.appendChild(flyCard);
-
-              gsap.to(flyCard, {
-                x: targetRect.left + targetRect.width / 2 - (deckRect.left + deckRect.width / 2),
-                y: targetRect.top + targetRect.height / 2 - (deckRect.top + deckRect.height / 2),
-                rotation: i === 0 ? 360 : -360,
-                scale: 0.7,
-                opacity: 0.1,
-                delay: i * 0.14,
-                duration: 0.6,
-                ease: 'power2.inOut',
-                onComplete: () => {
-                  flyCard.remove();
-                },
-              });
-            }
+            launchOpponentDrawOverlay(targetEl, room.current_side, cardCountToFly);
           }
         }
       }
@@ -236,20 +215,39 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         setPenaltyAnnouncement(null);
         penaltyTimerRef.current = null;
       }, 2500);
-    } else if (action.message) {
-      // Normal game action banner (play, pass, flip) — auto-dismiss after 3s
-      setTimeout(() => {
-        setActionBanner(action.message);
-      }, 0);
-      if (actionBannerTimerRef.current) {
-        clearTimeout(actionBannerTimerRef.current);
+    } else {
+      // Normal game action (play, draw, pass, flip)
+      // Trigger opponent card-back flight animations
+      if (typeof window !== 'undefined' && action.playerId && action.playerId !== me?.profile_id) {
+        const opponentSeatEl =
+          document.getElementById(`opponent-card-stack-${action.playerId}`) ||
+          document.getElementById(`opponent-seat-${action.playerId}`);
+
+        if (opponentSeatEl) {
+          if (action.type === 'play') {
+            launchOpponentPlayOverlay(opponentSeatEl, room.current_side);
+          } else if (action.type === 'draw') {
+            const count = action.drawnCount || 1;
+            launchOpponentDrawOverlay(opponentSeatEl, room.current_side, count);
+          }
+        }
       }
-      actionBannerTimerRef.current = setTimeout(() => {
-        setActionBanner(null);
-        actionBannerTimerRef.current = null;
-      }, 3000);
+
+      if (action.message) {
+        // Normal game action banner (play, pass, flip) — auto-dismiss after 3s
+        setTimeout(() => {
+          setActionBanner(action.message);
+        }, 0);
+        if (actionBannerTimerRef.current) {
+          clearTimeout(actionBannerTimerRef.current);
+        }
+        actionBannerTimerRef.current = setTimeout(() => {
+          setActionBanner(null);
+          actionBannerTimerRef.current = null;
+        }, 3000);
+      }
     }
-  }, [room.last_action, me?.profile_id]);
+  }, [room.last_action, room.current_side, me?.profile_id]);
 
   // Handle card click
   const handleCardClick = useCallback(
@@ -329,7 +327,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       />
 
       {/* TOP HUD BAR */}
-      <header className="relative z-20 w-full max-w-5xl mx-auto px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-between border-b border-[#2D333B]/80 bg-[#15191F]/80 backdrop-blur-md rounded-b-xl shadow-lg pt-[max(0.5rem,env(safe-area-inset-top,0px))]">
+      <header className="relative z-20 w-full max-w-5xl mx-auto px-2 sm:px-4 py-1.5 sm:py-2 flex items-center justify-between border-b border-[#2D333B]/80 bg-[#15191F]/90 backdrop-blur-md rounded-b-xl shadow-lg pt-[max(0.35rem,env(safe-area-inset-top,0px))] shrink-0">
         {/* Room Info & Side Indicator */}
         <div className="flex items-center gap-1.5 sm:gap-3">
           <div
@@ -408,8 +406,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
       {/* Prominent Penalty Announcement Toast Banner */}
       {penaltyAnnouncement && (
-        <div className="absolute top-16 inset-x-0 z-40 flex justify-center pointer-events-none px-4">
-          <div className="bg-[#ED1C24] border-2 border-white text-white text-xs sm:text-sm font-black px-5 py-2.5 rounded-full shadow-2xl animate-bounce flex items-center gap-2">
+        <div className="absolute top-13 sm:top-14 inset-x-0 z-40 flex justify-center pointer-events-none px-4">
+          <div className="bg-[#ED1C24] border-2 border-white text-white text-xs sm:text-sm font-black px-4 py-1.5 rounded-full shadow-2xl animate-bounce flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 stroke-[2.5]" />
             <span>{penaltyAnnouncement.message}</span>
           </div>
@@ -418,8 +416,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
       {/* Floating Action Announcement Toast */}
       {actionBanner && !penaltyAnnouncement && (
-        <div className="absolute top-16 inset-x-0 z-30 flex justify-center pointer-events-none px-4">
-          <div className="bg-[#1E232B] border border-[#2D333B] text-white text-xs sm:text-sm font-medium px-4 py-2 rounded-full shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="absolute top-13 sm:top-14 inset-x-0 z-30 flex justify-center pointer-events-none px-4">
+          <div className="bg-[#1E232B] border border-[#2D333B] text-white text-xs sm:text-sm font-medium px-3.5 py-1.5 rounded-full shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
             {room.last_action?.type === 'player_left' ? (
               <UserMinus className="w-4 h-4 text-[#ED1C24]" />
             ) : room.last_action?.type === 'player_disconnected' ? (
@@ -437,11 +435,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* MAIN GAME TABLE (GSAP Ref) */}
       <main
         ref={boardRef}
-        className="relative z-10 flex-1 flex flex-col items-center justify-center max-w-5xl mx-auto w-full px-1 xs:px-2 min-h-0"
+        className="relative z-10 flex-1 flex flex-col items-center justify-start sm:justify-evenly max-w-5xl mx-auto w-full px-1 xs:px-2 pt-3 sm:pt-4 pb-1 min-h-0"
         style={{ transformStyle: 'preserve-3d' }}
       >
         {/* Opponents Row (Top / Sides) */}
-        <div className="w-full flex items-center justify-around mb-2 xs:mb-3 sm:mb-6 max-w-3xl px-1">
+        <div
+          className={`w-full flex items-center ${
+            opponents.length === 1 ? 'justify-center' : 'justify-around'
+          } mt-0.5 sm:mt-1 mb-1 sm:mb-2 max-w-3xl px-1 shrink-0 z-10`}
+        >
           {opponents.map((opponent, idx) => (
             <OpponentSeat
               key={opponent.id}
@@ -458,7 +460,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   : '+2 CARDS PENALTY'
               }
               onChallengeUno={onChallengeUno}
-              position={idx === 1 ? 'top' : idx === 0 ? 'left' : 'right'}
+              position={
+                opponents.length === 1
+                  ? 'top'
+                  : opponents.length === 2
+                  ? idx === 0
+                    ? 'left'
+                    : 'right'
+                  : idx === 0
+                  ? 'left'
+                  : idx === 1
+                  ? 'top'
+                  : 'right'
+              }
             />
           ))}
         </div>
