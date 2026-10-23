@@ -125,6 +125,10 @@ export const UnoCard: React.FC<UnoCardProps> = ({
       return <span className="font-black text-2xl sm:text-3xl select-none text-white">+2</span>;
     }
 
+    if (face.type === 'wild_draw_five') {
+      return <span className="font-black text-2xl sm:text-3xl select-none text-white">+5</span>;
+    }
+
     if (face.type === 'wild_draw_color') {
       return (
         <div className="flex flex-col items-center select-none text-white">
@@ -198,8 +202,10 @@ export const UnoCard: React.FC<UnoCardProps> = ({
   const cornerLabel = () => {
     if (face.type === 'number') return face.value;
     if (face.type === 'draw_one') return '+1';
+    if (face.type === 'draw_two') return '+2';
     if (face.type === 'draw_five') return '+5';
     if (face.type === 'wild_draw_two') return '+2';
+    if (face.type === 'wild_draw_five') return '+5';
     if (face.type === 'wild_draw_color') return '🎨';
     if (face.type === 'reverse') return '⇄';
     if (face.type === 'skip') return '⊘';

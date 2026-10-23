@@ -100,3 +100,52 @@ export function playUnoCallSound(): void {
     // Audio playback error safely ignored
   }
 }
+
+/**
+ * Plays a dynamic whoosh / flip sound effect when the deck or game flips sides.
+ */
+export function playFlipSound(): void {
+  if (isSoundMuted()) return;
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+
+    // Resonant whoosh sweep
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(600, now);
+    osc.frequency.exponentialRampToValueAtTime(150, now + 0.28);
+
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.3);
+
+    // Followed by a crisp snap/landing
+    const snapOsc = ctx.createOscillator();
+    const snapGain = ctx.createGain();
+
+    snapOsc.type = 'triangle';
+    snapOsc.frequency.setValueAtTime(350, now + 0.15);
+    snapOsc.frequency.exponentialRampToValueAtTime(90, now + 0.35);
+
+    snapGain.gain.setValueAtTime(0.12, now + 0.15);
+    snapGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+    snapOsc.connect(snapGain);
+    snapGain.connect(ctx.destination);
+
+    snapOsc.start(now + 0.15);
+    snapOsc.stop(now + 0.35);
+  } catch {
+    // Audio playback error safely ignored
+  }
+}

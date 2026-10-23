@@ -205,6 +205,7 @@ export async function POST(req: Request) {
         .from('game_rooms')
         .update({
           draw_pile_count: newDrawPile.length,
+          draw_penalty: 0,
           uno_challenge_target: null,
           uno_called_by: updatedUnoCalledBy,
           pending_draw_decision: pendingDecision,
@@ -258,6 +259,7 @@ export async function POST(req: Request) {
       .update({
         current_turn_seat: nextSeat,
         draw_pile_count: newDrawPile.length,
+        draw_penalty: 0,
         uno_challenge_target: null,
         uno_called_by: updatedUnoCalledBy,
         pending_draw_decision: null,

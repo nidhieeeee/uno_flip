@@ -22,6 +22,7 @@ export type DarkCardType =
   | 'skip_everyone'
   | 'flip'
   | 'wild'
+  | 'wild_draw_five'
   | 'wild_draw_color';
 
 export interface CardFace<TColor, TType> {

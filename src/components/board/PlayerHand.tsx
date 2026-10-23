@@ -34,6 +34,11 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
   disabled = false,
 }) => {
   const [peekOtherSide, setPeekOtherSide] = useState(false);
+  const [prevActiveSide, setPrevActiveSide] = useState(activeSide);
+  if (activeSide !== prevActiveSide) {
+    setPrevActiveSide(activeSide);
+    setPeekOtherSide(false);
+  }
   const [isCallingUno, setIsCallingUno] = useState(false);
   const [justCalledUno, setJustCalledUno] = useState(false);
   const [showPenalty, setShowPenalty] = useState(isPenalized);

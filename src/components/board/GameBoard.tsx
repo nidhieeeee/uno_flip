@@ -12,7 +12,7 @@ import { ColorPickerModal } from '../modals/ColorPickerModal';
 import { GameOverModal } from '../modals/GameOverModal';
 import { HowToPlayModal } from '../modals/HowToPlayModal';
 import { DrawDecisionModal } from '../modals/DrawDecisionModal';
-import { isSoundMuted, playPenaltySound, toggleSoundMuted } from '@/lib/audio/sound';
+import { isSoundMuted, playFlipSound, playPenaltySound, toggleSoundMuted } from '@/lib/audio/sound';
 import {
   Clock,
   FlipHorizontal,
@@ -116,6 +116,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   useEffect(() => {
     if (prevSideRef.current !== room.current_side && boardRef.current) {
       prevSideRef.current = room.current_side;
+      playFlipSound();
 
       // Animate 3D board flip cleanly and quickly
       gsap.fromTo(

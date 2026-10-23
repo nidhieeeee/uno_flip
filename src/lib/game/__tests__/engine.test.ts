@@ -15,7 +15,7 @@ describe('UNO FLIP Deck Generation', () => {
     expect(deck).toHaveLength(112);
   });
 
-  it('should generate 72 number cards with values 1-9', () => {
+  it('should generate 72 number cards with values 1-9 with distinct faces', () => {
     const deck = generateUnoFlipDeck();
     const numbers = deck.filter((c) => c.light.type === 'number');
     expect(numbers).toHaveLength(72);
@@ -23,7 +23,9 @@ describe('UNO FLIP Deck Generation', () => {
       expect(c.light.value).toBeGreaterThanOrEqual(1);
       expect(c.light.value).toBeLessThanOrEqual(9);
       expect(c.dark.type).toBe('number');
-      expect(c.dark.value).toBe(c.light.value);
+      expect(c.dark.value).toBeGreaterThanOrEqual(1);
+      expect(c.dark.value).toBeLessThanOrEqual(9);
+      expect(c.dark.value).not.toBe(c.light.value);
     });
   });
 
@@ -48,7 +50,7 @@ describe('UNO FLIP Deck Generation', () => {
     expect(deck.filter((c) => c.dark.type === 'wild')).toHaveLength(4);
 
     expect(deck.filter((c) => c.light.type === 'wild_draw_two')).toHaveLength(4);
-    expect(deck.filter((c) => c.dark.type === 'wild_draw_color')).toHaveLength(4);
+    expect(deck.filter((c) => c.dark.type === 'wild_draw_five')).toHaveLength(4);
   });
 });
 

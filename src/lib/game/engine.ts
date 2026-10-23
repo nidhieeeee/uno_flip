@@ -10,23 +10,235 @@ import {
 } from './types';
 import { DARK_COLORS, LIGHT_COLORS, shuffleDeck } from './deck';
 
+export interface CardEffectResolution {
+  cardType: string;
+  penaltyValue: number;
+  isPenalty: boolean;
+  isWild: boolean;
+  isFlip: boolean;
+  step: number;
+  directionMultiplier: 1 | -1;
+  requiresColorSelection: boolean;
+}
+
+/**
+ * Centralized, authoritative server-side card effect resolver.
+ * Evaluates card action and penalty strictly by explicit card type and active side,
+ * never inferred from color, displayed text, or array position.
+ */
+export function resolveCardEffect(
+  card: UnoFlipCard,
+  side: Side,
+  playerCount = 4
+): CardEffectResolution {
+  const face = side === 'light' ? card.light : card.dark;
+
+  if (side === 'light') {
+    switch (face.type) {
+      case 'draw_one':
+        return {
+          cardType: 'draw_one',
+          penaltyValue: 1,
+          isPenalty: true,
+          isWild: false,
+          isFlip: false,
+          step: 1,
+          directionMultiplier: 1,
+          requiresColorSelection: false,
+        };
+      case 'draw_two':
+        return {
+          cardType: 'draw_two',
+          penaltyValue: 2,
+          isPenalty: true,
+          isWild: false,
+          isFlip: false,
+          step: 1,
+          directionMultiplier: 1,
+          requiresColorSelection: false,
+        };
+      case 'wild_draw_two':
+        return {
+          cardType: 'wild_draw_two',
+          penaltyValue: 2,
+          isPenalty: true,
+          isWild: true,
+          isFlip: false,
+          step: 1,
+          directionMultiplier: 1,
+          requiresColorSelection: true,
+        };
+      case 'reverse':
+        return {
+          cardType: 'reverse',
+          penaltyValue: 0,
+          isPenalty: false,
+          isWild: false,
+          isFlip: false,
+          step: playerCount === 2 ? 2 : 1,
+          directionMultiplier: playerCount === 2 ? 1 : -1,
+          requiresColorSelection: false,
+        };
+      case 'skip':
+        return {
+          cardType: 'skip',
+          penaltyValue: 0,
+          isPenalty: false,
+          isWild: false,
+          isFlip: false,
+          step: 2,
+          directionMultiplier: 1,
+          requiresColorSelection: false,
+        };
+      case 'flip':
+        return {
+          cardType: 'flip',
+          penaltyValue: 0,
+          isPenalty: false,
+          isWild: false,
+          isFlip: true,
+          step: 1,
+          directionMultiplier: 1,
+          requiresColorSelection: false,
+        };
+      case 'wild':
+        return {
+          cardType: 'wild',
+          penaltyValue: 0,
+          isPenalty: false,
+          isWild: true,
+          isFlip: false,
+          step: 1,
+          directionMultiplier: 1,
+          requiresColorSelection: true,
+        };
+      case 'number':
+      default:
+        return {
+          cardType: face.type,
+          penaltyValue: 0,
+          isPenalty: false,
+          isWild: false,
+          isFlip: false,
+          step: 1,
+          directionMultiplier: 1,
+          requiresColorSelection: false,
+        };
+    }
+  } else {
+    // Dark Side
+    switch (face.type) {
+      case 'draw_two':
+        return {
+          cardType: 'draw_two',
+          penaltyValue: 2,
+          isPenalty: true,
+          isWild: false,
+          isFlip: false,
+          step: 1,
+          directionMultiplier: 1,
+          requiresColorSelection: false,
+        };
+      case 'draw_five':
+        return {
+          cardType: 'draw_five',
+          penaltyValue: 5,
+          isPenalty: true,
+          isWild: false,
+          isFlip: false,
+          step: 1,
+          directionMultiplier: 1,
+          requiresColorSelection: false,
+        };
+      case 'wild_draw_five':
+        return {
+          cardType: 'wild_draw_five',
+          penaltyValue: 5,
+          isPenalty: true,
+          isWild: true,
+          isFlip: false,
+          step: 1,
+          directionMultiplier: 1,
+          requiresColorSelection: true,
+        };
+      case 'wild_draw_color':
+        return {
+          cardType: 'wild_draw_color',
+          penaltyValue: 0,
+          isPenalty: false,
+          isWild: true,
+          isFlip: false,
+          step: 2,
+          directionMultiplier: 1,
+          requiresColorSelection: true,
+        };
+      case 'reverse':
+        return {
+          cardType: 'reverse',
+          penaltyValue: 0,
+          isPenalty: false,
+          isWild: false,
+          isFlip: false,
+          step: playerCount === 2 ? 2 : 1,
+          directionMultiplier: playerCount === 2 ? 1 : -1,
+          requiresColorSelection: false,
+        };
+      case 'skip_everyone':
+        return {
+          cardType: 'skip_everyone',
+          penaltyValue: 0,
+          isPenalty: false,
+          isWild: false,
+          isFlip: false,
+          step: 0,
+          directionMultiplier: 1,
+          requiresColorSelection: false,
+        };
+      case 'flip':
+        return {
+          cardType: 'flip',
+          penaltyValue: 0,
+          isPenalty: false,
+          isWild: false,
+          isFlip: true,
+          step: 1,
+          directionMultiplier: 1,
+          requiresColorSelection: false,
+        };
+      case 'wild':
+        return {
+          cardType: 'wild',
+          penaltyValue: 0,
+          isPenalty: false,
+          isWild: true,
+          isFlip: false,
+          step: 1,
+          directionMultiplier: 1,
+          requiresColorSelection: true,
+        };
+      case 'number':
+      default:
+        return {
+          cardType: face.type,
+          penaltyValue: 0,
+          isPenalty: false,
+          isWild: false,
+          isFlip: false,
+          step: 1,
+          directionMultiplier: 1,
+          requiresColorSelection: false,
+        };
+    }
+  }
+}
+
 /**
  * Calculates the penalty draw value of a card for stacking rules.
- * Supports canonical UNO FLIP cards and custom sets (draw_one = 1, draw_two / wild_draw_two = 2, draw_five = 5).
+ * Authoritative: delegates to resolveCardEffect based on explicit card type and active side.
+ * A regular Wild card always returns 0 penalty.
  */
 export function getCardPenaltyValue(card: UnoFlipCard, side: Side): number {
-  const face = side === 'light' ? card.light : card.dark;
-  switch (face.type) {
-    case 'draw_one':
-      return 1;
-    case 'draw_two':
-    case 'wild_draw_two':
-      return 2;
-    case 'draw_five':
-      return 5;
-    default:
-      return 0;
-  }
+  return resolveCardEffect(card, side).penaltyValue;
 }
 
 /**
@@ -357,6 +569,12 @@ export function processCardPlay(params: ProcessCardPlayParams): PlayCardResult {
       break;
     }
 
+    case 'wild_draw_five': { // Dark Side (+5)
+      nextActiveColor = chosenColor || null;
+      step = 1;
+      break;
+    }
+
     case 'wild_draw_color': { // Dark Side
       nextActiveColor = chosenColor || null;
       const targetSeat = calculateNextSeat(player.seat_index, players, nextDirection, 1);
@@ -624,6 +842,7 @@ export function processTurnTimeout(params: TurnTimeoutParams): TurnTimeoutResult
       success: true,
       updatedRoom: {
         current_turn_seat: nextSeat,
+        draw_penalty: 0,
         pending_draw_decision: null,
         turn_started_at: new Date(now).toISOString(),
         turn_deadline: new Date(now + turnDurationMs).toISOString(),
@@ -851,6 +1070,7 @@ export function processDrawDecision(params: ProcessDrawDecisionParams): ProcessD
       success: true,
       updatedRoom: {
         current_turn_seat: nextSeat,
+        draw_penalty: 0,
         pending_draw_decision: null,
         turn_started_at: new Date(now).toISOString(),
         turn_deadline: new Date(now + turnDurationMs).toISOString(),
