@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { PlayerProfile } from '@/lib/game/types';
 import { apiFetch, setClientPlayerToken } from '@/lib/game/clientSession';
 import { HowToPlayModal } from '../modals/HowToPlayModal';
+import { UfLogo } from '../common/UfLogo';
 import { ArrowRight, HelpCircle, Plus, User } from 'lucide-react';
 
 interface HomeScreenProps {
@@ -111,11 +112,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* Top Header */}
       <header className="relative z-10 w-full max-w-3xl mx-auto flex items-center justify-between border border-[#2D333B]/80 bg-[#15191F]/75 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-xl shadow-lg">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded bg-[#ED1C24] text-white flex items-center justify-center font-bold text-xs">
-            UF
-          </div>
-          <span className="font-bold text-sm tracking-wide text-white">UNO FLIP</span>
+        <div className="flex items-center gap-2.5">
+          <UfLogo size="sm" />
+          <span className="font-extrabold text-sm tracking-wide text-white">UNO FLIP</span>
         </div>
 
         <button
@@ -130,7 +129,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* Main Card Container */}
       <main className="relative z-10 w-full max-w-md mx-auto my-auto flex flex-col items-center px-1">
         {/* Title & Description */}
-        <div className="text-center mb-5 sm:mb-6">
+        <div className="text-center mb-5 sm:mb-6 flex flex-col items-center">
+          <div className="mb-3">
+            <UfLogo size="2xl" glow className="animate-in zoom-in-95 duration-200" />
+          </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-1">
             UNO FLIP Online
           </h1>

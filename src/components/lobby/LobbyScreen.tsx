@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { GamePlayer, GameRoom, PlayerProfile } from '@/lib/game/types';
+import { UfLogo } from '../common/UfLogo';
 import {
   Check,
   CheckCircle2,
@@ -82,10 +83,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
       {/* Top Navbar */}
       <header className="relative z-10 w-full max-w-3xl mx-auto flex items-center justify-between border border-[#2D333B]/80 bg-[#15191F]/75 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-xl shadow-lg">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded bg-[#ED1C24] text-white flex items-center justify-center font-bold text-xs">
-            UF
-          </div>
+        <div className="flex items-center gap-2.5">
+          <UfLogo size="sm" />
           <div>
             <h1 className="text-sm font-bold text-white tracking-wide">
               UNO FLIP <span className="text-[#9BA3AF] font-normal text-xs">/ Lobby</span>

@@ -7,6 +7,7 @@ import { HomeScreen } from '@/components/home/HomeScreen';
 import { LobbyScreen } from '@/components/lobby/LobbyScreen';
 import { GameBoard } from '@/components/board/GameBoard';
 import { HowToPlayModal } from '@/components/modals/HowToPlayModal';
+import { UfLogo } from '@/components/common/UfLogo';
 import { Loader2 } from 'lucide-react';
 
 function UnoFlipGame() {
@@ -75,10 +76,10 @@ function UnoFlipGame() {
     return (
       <div className="min-h-screen bg-[url('/background.png')] bg-cover bg-center bg-no-repeat bg-fixed text-white flex flex-col items-center justify-center p-4 relative">
         <div className="absolute inset-0 bg-black/40 pointer-events-none" />
-        <div className="relative z-10 w-14 h-14 rounded-xl bg-[#ED1C24] border-2 border-white flex items-center justify-center mb-4 shadow-xl">
-          <span className="font-bold text-lg text-white">UF</span>
+        <div className="relative z-10 mb-4 shadow-2xl">
+          <UfLogo size="xl" glow />
         </div>
-        <div className="relative z-10 flex items-center gap-2 text-[#9BA3AF] font-medium text-sm bg-[#1E232B]/80 backdrop-blur-md px-4 py-2 rounded-lg border border-[#2D333B]">
+        <div className="relative z-10 flex items-center gap-2 text-[#9BA3AF] font-medium text-sm bg-[#1E232B]/80 backdrop-blur-md px-4 py-2 rounded-xl border border-[#2D333B]">
           <Loader2 className="w-4 h-4 animate-spin text-[#FFCC00]" />
           <span>Connecting to Room {activeRoomCode}...</span>
         </div>
@@ -153,8 +154,12 @@ export default function Page() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#15191F] text-white flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#FFCC00]" />
+        <div className="min-h-screen bg-[#15191F] text-white flex flex-col items-center justify-center gap-3">
+          <UfLogo size="lg" glow />
+          <div className="flex items-center gap-2 text-xs font-bold text-[#FFCC00]">
+            <Loader2 className="w-4 h-4 animate-spin text-[#FFCC00]" />
+            <span>Loading UNO FLIP...</span>
+          </div>
         </div>
       }
     >

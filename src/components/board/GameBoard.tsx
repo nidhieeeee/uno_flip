@@ -14,6 +14,7 @@ import { ColorPickerModal } from '../modals/ColorPickerModal';
 import { GameOverModal } from '../modals/GameOverModal';
 import { HowToPlayModal } from '../modals/HowToPlayModal';
 import { DrawDecisionModal } from '../modals/DrawDecisionModal';
+import { UfLogo } from '../common/UfLogo';
 import { isSoundMuted, playFlipSound, playPenaltySound, toggleSoundMuted } from '@/lib/audio/sound';
 import {
   launchCardPlayOverlay,
@@ -376,7 +377,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* TOP HUD BAR */}
       <header className="relative z-20 w-full max-w-5xl mx-auto px-2 sm:px-4 py-1.5 sm:py-2 flex items-center justify-between border-b border-[#2D333B]/80 bg-[#15191F]/90 backdrop-blur-md rounded-b-xl shadow-lg pt-[max(0.35rem,env(safe-area-inset-top,0px))] shrink-0">
         {/* Room Info & Side Indicator */}
-        <div className="flex items-center gap-1.5 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2.5">
+          <div className="flex items-center gap-1.5">
+            <UfLogo size="xs" />
+            <span className="hidden sm:inline font-black text-[11px] tracking-wide text-white">
+              UNO FLIP
+            </span>
+          </div>
+
           <div
             className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg text-[10px] sm:text-xs font-black uppercase tracking-wider ${
               isLight

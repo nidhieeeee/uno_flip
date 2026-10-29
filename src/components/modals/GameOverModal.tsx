@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { GamePlayer, GameRoom } from '@/lib/game/types';
+import { UfLogo } from '../common/UfLogo';
 import { Crown, Home, RotateCcw, Trophy, UserMinus } from 'lucide-react';
 
 interface GameOverModalProps {
@@ -67,19 +68,24 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
     >
       <div className="relative w-full max-w-sm max-h-[90dvh] overflow-y-auto rounded-2xl bg-[#1E232B] border border-[#2D333B] p-5 sm:p-6 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-150">
-        {/* Trophy / Victory Badge */}
-        <div
-          className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 shadow-lg border ${
-            isMeWinner
-              ? 'bg-[#FFCC00] text-[#15191F] border-amber-300'
-              : 'bg-[#15191F] text-[#FFCC00] border-[#2D333B]'
-          }`}
-        >
-          {isMeWinner ? (
-            <Trophy className="w-7 h-7 fill-current stroke-[2.2]" />
-          ) : (
-            <Crown className="w-7 h-7 fill-current stroke-[2.2]" />
-          )}
+        {/* Trophy / Victory Badge with UF Branding */}
+        <div className="relative mb-3 flex items-center justify-center">
+          <div
+            className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg border ${
+              isMeWinner
+                ? 'bg-[#FFCC00] text-[#15191F] border-amber-300'
+                : 'bg-[#15191F] text-[#FFCC00] border-[#2D333B]'
+            }`}
+          >
+            {isMeWinner ? (
+              <Trophy className="w-7 h-7 fill-current stroke-[2.2]" />
+            ) : (
+              <Crown className="w-7 h-7 fill-current stroke-[2.2]" />
+            )}
+          </div>
+          <div className="absolute -bottom-1 -right-1 shadow-md">
+            <UfLogo size="xs" />
+          </div>
         </div>
 
         {/* Victory Header */}

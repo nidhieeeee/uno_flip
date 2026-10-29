@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { UfLogo } from '../common/UfLogo';
 import { HelpCircle, X } from 'lucide-react';
 
 interface HowToPlayModalProps {
@@ -24,8 +25,8 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
         </button>
 
         {/* Header */}
-        <div className="flex items-center gap-2 mb-4">
-          <HelpCircle className="w-5 h-5 text-[#FFCC00]" />
+        <div className="flex items-center gap-2.5 mb-4">
+          <UfLogo size="sm" />
           <h2 className="text-lg font-bold">Rules: How to Play UNO FLIP</h2>
         </div>
 
