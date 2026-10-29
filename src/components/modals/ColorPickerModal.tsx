@@ -3,6 +3,7 @@
 import React from 'react';
 import { CardColor, Side } from '@/lib/game/types';
 import { DARK_COLORS, LIGHT_COLORS } from '@/lib/game/deck';
+import { Palette, X } from 'lucide-react';
 
 interface ColorPickerModalProps {
   isOpen: boolean;
@@ -22,59 +23,131 @@ export const ColorPickerModal: React.FC<ColorPickerModalProps> = ({
   const isLight = side === 'light';
   const colors = isLight ? LIGHT_COLORS : DARK_COLORS;
 
-  const getColorButtonStyles = (color: CardColor) => {
+  const getColorDetails = (color: CardColor) => {
     switch (color) {
+      // Light Side
       case 'red':
-        return 'bg-[#ED1C24] text-white hover:brightness-105';
+        return {
+          bg: 'bg-[#ED1C24]',
+          text: 'text-white',
+          border: 'border-red-400/50',
+          dot: 'bg-white',
+          label: 'Red',
+        };
       case 'yellow':
-        return 'bg-[#FFCC00] text-[#111827] hover:brightness-105';
+        return {
+          bg: 'bg-[#FFCC00]',
+          text: 'text-[#111827]',
+          border: 'border-amber-300',
+          dot: 'bg-[#111827]',
+          label: 'Yellow',
+        };
       case 'green':
-        return 'bg-[#27AE60] text-white hover:brightness-105';
+        return {
+          bg: 'bg-[#27AE60]',
+          text: 'text-white',
+          border: 'border-emerald-400/50',
+          dot: 'bg-white',
+          label: 'Green',
+        };
       case 'blue':
-        return 'bg-[#1677E8] text-white hover:brightness-105';
+        return {
+          bg: 'bg-[#1677E8]',
+          text: 'text-white',
+          border: 'border-blue-400/50',
+          dot: 'bg-white',
+          label: 'Blue',
+        };
+
+      // Dark Side
       case 'pink':
-        return 'bg-[#D81B60] text-white hover:brightness-105';
+        return {
+          bg: 'bg-[#D81B60]',
+          text: 'text-white',
+          border: 'border-pink-400/50',
+          dot: 'bg-white',
+          label: 'Pink',
+        };
       case 'teal':
-        return 'bg-[#00897B] text-white hover:brightness-105';
+        return {
+          bg: 'bg-[#00897B]',
+          text: 'text-white',
+          border: 'border-teal-400/50',
+          dot: 'bg-white',
+          label: 'Teal',
+        };
       case 'orange':
-        return 'bg-[#E65100] text-white hover:brightness-105';
+        return {
+          bg: 'bg-[#E65100]',
+          text: 'text-white',
+          border: 'border-orange-400/50',
+          dot: 'bg-white',
+          label: 'Orange',
+        };
       case 'purple':
-        return 'bg-[#7B1FA2] text-white hover:brightness-105';
+        return {
+          bg: 'bg-[#7B1FA2]',
+          text: 'text-white',
+          border: 'border-purple-400/50',
+          dot: 'bg-white',
+          label: 'Purple',
+        };
+
       default:
-        return 'bg-[#2D333B] text-white';
+        return {
+          bg: 'bg-[#2D333B]',
+          text: 'text-white',
+          border: 'border-slate-500',
+          dot: 'bg-white',
+          label: color,
+        };
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-      <div className="relative w-full max-w-xs rounded-xl bg-[#1E232B] border border-[#2D333B] p-5 shadow-lg flex flex-col items-center">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Choose Wild Card Color"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150"
+    >
+      <div className="relative w-full max-w-xs rounded-2xl bg-[#1E232B] border border-[#2D333B] p-5 sm:p-6 shadow-2xl flex flex-col items-center animate-in zoom-in-95 duration-150">
+        {/* Header Icon */}
+        <div className="w-11 h-11 rounded-xl bg-[#15191F] border border-[#2D333B] text-[#FFCC00] flex items-center justify-center mb-2.5 shadow-inner">
+          <Palette className="w-5 h-5 stroke-[2.2]" />
+        </div>
+
         {/* Title */}
-        <h3 className="text-base font-bold text-white mb-1">Select Color</h3>
-        <p className="text-[#9BA3AF] text-xs text-center mb-4">
-          Choose color for the {isLight ? 'Light' : 'Dark'} Side
+        <h3 className="text-lg font-black text-white tracking-wide">Choose Color</h3>
+        <p className="text-[#9BA3AF] text-xs text-center mt-0.5 mb-4">
+          Select next active color for the{' '}
+          <span className="font-bold text-white">{isLight ? 'Light' : 'Dark'} Side</span>
         </p>
 
         {/* 2x2 Grid of Color Choices */}
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 w-full">
-          {colors.map((color) => (
-            <button
-              key={color}
-              onClick={() => onSelectColor(color)}
-              className={`min-h-[52px] h-14 sm:h-16 rounded-lg font-bold text-xs sm:text-sm uppercase tracking-wider transition-all active:scale-95 border border-white/20 flex items-center justify-center cursor-pointer touch-manipulation ${getColorButtonStyles(
-                color
-              )}`}
-            >
-              {color}
-            </button>
-          ))}
+        <div className="grid grid-cols-2 gap-3 w-full">
+          {colors.map((color) => {
+            const details = getColorDetails(color);
+            return (
+              <button
+                key={color}
+                onClick={() => onSelectColor(color)}
+                className={`min-h-[58px] h-16 rounded-xl font-black text-sm uppercase tracking-wider transition-all duration-150 active:scale-95 border flex flex-col items-center justify-center gap-1 cursor-pointer touch-manipulation shadow-md hover:brightness-105 ${details.bg} ${details.text} ${details.border}`}
+              >
+                <span className={`w-2 h-2 rounded-full ${details.dot} opacity-80`} />
+                <span>{details.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Cancel Button with proper tap target */}
+        {/* Cancel Button */}
         <button
           onClick={onCancel}
-          className="mt-3.5 min-h-[44px] px-4 flex items-center justify-center text-xs text-[#9BA3AF] hover:text-white transition-colors touch-manipulation cursor-pointer"
+          className="mt-4 min-h-[44px] px-4 py-2 flex items-center justify-center gap-1.5 text-xs font-semibold text-[#9BA3AF] hover:text-white rounded-lg hover:bg-[#15191F] transition-colors touch-manipulation cursor-pointer"
         >
-          Cancel
+          <X className="w-3.5 h-3.5" />
+          <span>Cancel</span>
         </button>
       </div>
     </div>

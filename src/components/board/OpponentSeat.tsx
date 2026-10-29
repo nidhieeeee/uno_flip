@@ -80,14 +80,14 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
     >
       {/* Floating Penalty Announcement Tag */}
       {showPenalty && (
-        <div className="absolute -top-6 sm:-top-7 z-30 px-2 py-0.5 rounded bg-[#ED1C24] text-white text-[8px] sm:text-[10px] font-black tracking-wider uppercase shadow-md animate-bounce whitespace-nowrap">
+        <div className="absolute -top-6 sm:-top-7 z-30 px-2 py-0.5 rounded bg-[#ED1C24] text-white text-[8px] sm:text-[10px] font-black tracking-wider uppercase shadow-md animate-in fade-in slide-in-from-bottom-1 duration-150 whitespace-nowrap">
           {penaltyLabel}
         </div>
       )}
 
       {/* Disconnected Grace Period Badge */}
       {!showPenalty && isDisconnected && (
-        <div className="absolute -top-6 sm:-top-7 z-30 px-2 py-0.5 rounded-full bg-[#ED1C24] text-white text-[8px] sm:text-[9px] font-bold tracking-wider uppercase shadow-md flex items-center gap-1 animate-pulse whitespace-nowrap">
+        <div className="absolute -top-6 sm:-top-7 z-30 px-2 py-0.5 rounded-full bg-[#ED1C24] text-white text-[8px] sm:text-[9px] font-bold tracking-wider uppercase shadow-md flex items-center gap-1 whitespace-nowrap">
           <WifiOff className="w-2.5 h-2.5" />
           <span>Disconnected</span>
         </div>
@@ -138,7 +138,7 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
             </span>
             {isCurrentTurn && !isDisconnected && (
               <span className="text-[8px] sm:text-[9px] font-bold text-[#FFCC00] uppercase tracking-wider flex items-center gap-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#FFCC00] animate-ping inline-block" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#FFCC00] inline-block" />
                 <span>Turn</span>
               </span>
             )}
@@ -220,11 +220,11 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
             {/* Prominent UNO! Badge when player has exactly 1 card */}
             {cardCount === 1 && (
               <div
-                className={`flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm transition-all ${
+                className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm transition-all ${
                   player.has_called_uno
                     ? 'bg-[#27AE60] text-white border border-[#27AE60]'
                     : isVulnerable
-                    ? 'bg-[#ED1C24] text-white ring-1 ring-[#FFCC00] animate-pulse'
+                    ? 'bg-[#ED1C24] text-white ring-1 ring-[#FFCC00]'
                     : 'bg-[#ED1C24] text-white'
                 }`}
               >
@@ -237,7 +237,7 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
             {canChallenge && onChallengeUno && (
               <button
                 onClick={() => onChallengeUno(player.profile_id)}
-                className="flex items-center justify-center gap-0.5 min-h-[24px] px-1.5 py-0.5 rounded bg-[#ED1C24] text-white font-bold text-[8px] sm:text-[9px] uppercase tracking-wider hover:bg-[#D3141B] active:scale-95 transition-all shadow-sm animate-pulse cursor-pointer touch-manipulation"
+                className="flex items-center justify-center gap-0.5 min-h-[24px] px-2 py-0.5 rounded bg-[#ED1C24] text-white font-bold text-[8px] sm:text-[9px] uppercase tracking-wider hover:bg-[#D3141B] active:scale-95 transition-all shadow-sm cursor-pointer touch-manipulation"
                 title={`Catch ${nickname} for not calling UNO!`}
               >
                 <ShieldAlert className="w-2.5 h-2.5 stroke-[2.5]" />

@@ -7,7 +7,7 @@ import { UnoCard } from '../card/UnoCard';
 import { computeHandLayout } from '@/lib/game/handLayout';
 import { playUnoCallSound } from '@/lib/audio/sound';
 import { launchCardPlayOverlay } from '@/lib/game/cardAnimation';
-import { Check, Eye, Flame, ShieldAlert } from 'lucide-react';
+import { Check, Clock, Eye, Flame, ShieldAlert, Sparkles } from 'lucide-react';
 
 interface PlayerHandProps {
   cards: UnoFlipCard[];
@@ -21,11 +21,11 @@ interface PlayerHandProps {
   isPenalized?: boolean;
   penaltyMessage?: string | null;
   disabled?: boolean;
+  turnSecondsLeft?: number | null;
+  drawPenalty?: number;
+  canStack?: boolean;
 }
 
-/**
- * Isolated countdown badge to prevent ticking intervals from re-rendering the cards container.
- */
 /**
  * Hook to manage countdown without impure calls during render or synchronous setState in effects.
  */
@@ -72,7 +72,7 @@ const UnoCountdownBadge: React.FC<{
   }
 
   return (
-    <div className="mb-2 px-3.5 py-1 rounded-full bg-[#ED1C24] text-white text-xs font-black tracking-wider uppercase shadow-lg animate-pulse flex items-center gap-1.5">
+    <div className="mb-2 px-3.5 py-1 rounded-full bg-[#ED1C24] border border-white/20 text-white text-xs font-black tracking-wider uppercase shadow-lg flex items-center gap-1.5 animate-in fade-in slide-in-from-bottom-1 duration-150">
       <Flame className="w-3.5 h-3.5 fill-current text-[#FFCC00]" />
       <span>CALL UNO NOW! {secondsLeft}s remaining or +2 cards penalty!</span>
     </div>
@@ -110,11 +110,11 @@ const UnoButton: React.FC<{
     <button
       onClick={onClick}
       disabled={buttonDisabled}
-      className={`flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all touch-manipulation active:scale-95 ${
+      className={`flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-xl font-bold text-xs uppercase tracking-wider transition-all touch-manipulation active:scale-95 ${
         hasCalledUno || justCalledUno
           ? 'bg-[#27AE60] text-white border border-[#27AE60] shadow-sm cursor-default'
           : isUnoVulnerable
-          ? 'bg-[#FFCC00] text-[#15191F] ring-2 ring-[#ED1C24] ring-offset-2 ring-offset-[#15191F] animate-pulse shadow-md font-black hover:bg-[#E6B800] scale-105 cursor-pointer'
+          ? 'bg-[#FFCC00] text-[#15191F] ring-2 ring-[#ED1C24] ring-offset-2 ring-offset-[#15191F] shadow-md font-black hover:bg-[#E6B800] scale-105 cursor-pointer'
           : 'bg-[#1E232B] text-[#9BA3AF]/50 border border-[#2D333B] opacity-50 cursor-not-allowed'
       }`}
       title={
@@ -154,6 +154,9 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
   isPenalized = false,
   penaltyMessage,
   disabled = false,
+  turnSecondsLeft,
+  drawPenalty = 0,
+  canStack = false,
 }) => {
   const [peekOtherSide, setPeekOtherSide] = useState(false);
   const [prevActiveSide, setPrevActiveSide] = useState(activeSide);
@@ -432,7 +435,7 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
     >
       {/* Floating Penalty Notification Badge */}
       {showPenalty && (
-        <div className="absolute -top-7 z-30 px-3 py-1 rounded-full bg-[#ED1C24] text-white text-xs font-black tracking-wider uppercase shadow-lg animate-bounce flex items-center gap-1.5">
+        <div className="absolute -top-7 z-30 px-3 py-1 rounded-full bg-[#ED1C24] border border-white/20 text-white text-xs font-black tracking-wider uppercase shadow-lg flex items-center gap-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
           <ShieldAlert className="w-3.5 h-3.5" />
           <span>{penaltyMessage || '+2 CARDS PENALTY — You forgot to call UNO!'}</span>
         </div>
@@ -446,8 +449,34 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
         />
       )}
 
-      {/* Controls Bar: UNO & Peek Buttons */}
-      <div className="flex items-center gap-2 mb-2">
+      {/* Controls Bar: Turn Indicator, Penalty Prompt, UNO & Peek Buttons */}
+      <div className="flex flex-wrap items-center justify-center gap-2 mb-2 max-w-full px-2">
+        {/* Local Player Turn Indicator Pill */}
+        {isMyTurn ? (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFCC00] text-[#15191F] text-xs font-black uppercase tracking-wider shadow-[0_0_12px_rgba(255,204,0,0.3)] border border-amber-300">
+            <Sparkles className="w-3.5 h-3.5 fill-current" />
+            <span>YOUR TURN</span>
+            {turnSecondsLeft !== null && turnSecondsLeft !== undefined && (
+              <span className="font-mono font-bold bg-[#15191F]/20 px-1.5 py-0.5 rounded text-[10px]">
+                {turnSecondsLeft}s
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#15191F]/80 border border-[#2D333B] text-[#9BA3AF] text-xs font-semibold">
+            <Clock className="w-3 h-3 text-[#9BA3AF]" />
+            <span>Waiting for opponent...</span>
+          </div>
+        )}
+
+        {/* Penalty Stacking Action Hint */}
+        {isMyTurn && drawPenalty > 0 && (
+          <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#ED1C24] text-white text-[11px] font-black uppercase tracking-wider shadow-md border border-red-400/40">
+            <span>{canStack ? `DRAW ${drawPenalty} OR STACK` : `DRAW +${drawPenalty} PENALTY`}</span>
+          </div>
+        )}
+
+        {/* UNO Button */}
         <UnoButton
           disabled={disabled}
           isCallingUno={isCallingUno}
@@ -462,7 +491,7 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
         {/* Peek Other Side Toggle Button */}
         <button
           onClick={() => setPeekOtherSide((prev) => !prev)}
-          className={`flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-lg text-xs font-medium border transition-colors cursor-pointer touch-manipulation active:scale-95 ${
+          className={`flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-medium border transition-colors cursor-pointer touch-manipulation active:scale-95 ${
             peekOtherSide
               ? 'bg-[#1E232B] border-[#FFCC00] text-[#FFCC00]'
               : 'bg-[#1E232B] border-[#2D333B] text-[#9BA3AF] hover:text-white'
@@ -508,11 +537,14 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
                   height: `${layout.cardHeight}px`,
                   marginLeft: `${marginLeft}px`,
                   flexShrink: 0,
-                  // CSS transition only on width/height for resizing; NO margin-left transition to prevent fighting GSAP x transform
                   transition: 'width 0.2s ease-out, height 0.2s ease-out',
                   willChange: 'transform',
                 }}
-                className="relative"
+                className={`relative ${
+                  playable
+                    ? 'hover:-translate-y-2.5 hover:z-40 transition-transform duration-150'
+                    : ''
+                }`}
               >
                 <UnoCard
                   card={card}

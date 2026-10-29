@@ -144,6 +144,18 @@ export const UnoCard: React.FC<UnoCardProps> = ({
       );
     }
 
+    if (face.type === 'draw_two') {
+      return (
+        <span
+          className={`font-black select-none ${actionTextClass} ${getSymbolColorClass(
+            face.color
+          )}`}
+        >
+          +2
+        </span>
+      );
+    }
+
     if (face.type === 'draw_five') {
       return (
         <span
@@ -272,10 +284,10 @@ export const UnoCard: React.FC<UnoCardProps> = ({
         ...(typeof height === 'number' ? { height: `${height}px` } : {}),
         ...style,
       }}
-      className={`relative select-none transition-colors duration-150 touch-manipulation ${sizeStyles || ''} ${
+      className={`relative select-none transition-all duration-150 touch-manipulation ${sizeStyles || ''} ${
         isPlayable
-          ? 'cursor-pointer ring-2 ring-[#FFCC00] hover:brightness-105 active:scale-95'
-          : 'cursor-default opacity-95'
+          ? 'cursor-pointer ring-2 ring-[#FFCC00] shadow-[0_2px_12px_rgba(255,204,0,0.28)] hover:brightness-105 active:scale-95 opacity-100'
+          : 'cursor-default opacity-85'
       } ${className}`}
     >
       {/* Outer Card Frame: Classic White Border on Light, Dark Border on Dark */}

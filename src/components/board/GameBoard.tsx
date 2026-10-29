@@ -4,10 +4,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { CardColor, GamePlayer, GameRoom, PlayerProfile, Side, UnoFlipCard } from '@/lib/game/types';
 import { isValidPlay } from '@/lib/game/engine';
+import { formatGameActionMessage, getActionUniqueKey, FormattedGameEvent } from '@/lib/game/activityLog';
 import { DiscardPile } from '../card/DiscardPile';
 import { DeckPile } from '../card/DeckPile';
 import { PlayerHand } from './PlayerHand';
 import { OpponentSeat } from './OpponentSeat';
+import { GameActivityFeed } from './GameActivityFeed';
 import { ColorPickerModal } from '../modals/ColorPickerModal';
 import { GameOverModal } from '../modals/GameOverModal';
 import { HowToPlayModal } from '../modals/HowToPlayModal';
@@ -76,6 +78,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const [actionBanner, setActionBanner] = useState<string | null>(null);
   const [soundMuted, setSoundMutedState] = useState(isSoundMuted());
   const [currentTurnTime, setCurrentTurnTime] = useState(() => Date.now());
+  const [events, setEvents] = useState<FormattedGameEvent[]>([]);
+  const recordedEventKeysRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     // Suspend countdown if draw decision is pending or no deadline is set
@@ -114,10 +118,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // Active player details
   const activePlayer = players.find((p) => p.seat_index === room.current_turn_seat);
   const activePlayerName = isMyTurn
-    ? 'Your Turn!'
+    ? 'YOUR TURN'
     : `${activePlayer?.profile?.nickname || 'Player'} is playing...`;
 
-  // GSAP 3D Board Flip Animation when side changes
+  // GSAP 3D Board Flip Animation when side changes (brief and noticeable: ~280ms)
   useEffect(() => {
     if (prevSideRef.current !== room.current_side && boardRef.current) {
       prevSideRef.current = room.current_side;
@@ -130,25 +134,67 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       if (isReducedMotion) {
         gsap.fromTo(
           boardRef.current,
-          { opacity: 0.6 },
-          { opacity: 1, duration: 0.2, ease: 'power1.out' }
+          { opacity: 0.7 },
+          { opacity: 1, duration: 0.15, ease: 'power1.out' }
         );
       } else {
-        // Animate 3D board flip cleanly and quickly
+        // Animate 3D board flip cleanly and quickly (280ms)
         gsap.fromTo(
           boardRef.current,
-          { rotateY: -180, scale: 0.95, opacity: 0.7 },
+          { rotateY: -180, scale: 0.96, opacity: 0.8 },
           {
             rotateY: 0,
             scale: 1,
             opacity: 1,
-            duration: 0.5,
+            duration: 0.28,
             ease: 'power2.out',
           }
         );
       }
     }
   }, [room.current_side]);
+
+  // Synchronize Live Game Activity Feed with authoritative confirmed events
+  useEffect(() => {
+    if (!room.last_action) return;
+    const action = room.last_action;
+    const key = getActionUniqueKey(action);
+
+    if (recordedEventKeysRef.current.has(key)) return;
+    recordedEventKeysRef.current.add(key);
+
+    const formattedMsg = formatGameActionMessage(action, room.current_side);
+    const newEvt: FormattedGameEvent = {
+      id: key,
+      type: action.type,
+      message: formattedMsg,
+      playerName: action.playerName || 'Player',
+      timestamp: action.timestamp || Date.now(),
+    };
+
+    setEvents((prev) => [...prev.slice(-9), newEvt]);
+  }, [room.last_action, room.current_side]);
+
+  // Record win event authoritatively in feed upon match conclusion
+  useEffect(() => {
+    if (room.status === 'finished' && room.winner_id) {
+      const winKey = `win_${room.id}_${room.winner_id}`;
+      if (!recordedEventKeysRef.current.has(winKey)) {
+        recordedEventKeysRef.current.add(winKey);
+        const winner = players.find((p) => p.profile_id === room.winner_id);
+        const isMeWinner = room.winner_id === me?.profile_id;
+        const winnerName = isMeWinner ? 'You' : winner?.profile?.nickname || 'Player';
+        const winEvt: FormattedGameEvent = {
+          id: winKey,
+          type: 'win',
+          message: `${winnerName} wins!`,
+          playerName: winnerName,
+          timestamp: Date.now(),
+        };
+        setEvents((prev) => [...prev.slice(-9), winEvt]);
+      }
+    }
+  }, [room.status, room.winner_id, room.id, players, me?.profile_id]);
 
   // Handle Penalty Action Animation, Sound, and Temporary Action Banners
   useEffect(() => {
@@ -191,11 +237,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             document.getElementById(`opponent-seat-${targetId}`);
 
         if (targetEl) {
-          // Shake target area
+          // Subtle shake target area
           gsap.fromTo(
             targetEl,
-            { x: -8 },
-            { x: 0, duration: 0.45, ease: 'elastic.out(1, 0.3)' }
+            { x: -6 },
+            { x: 0, duration: 0.35, ease: 'power2.out' }
           );
 
           // Fly penalty cards from draw pile to opponent seat using authentic UNO FLIP card-back
@@ -296,12 +342,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     [room.top_card, room.current_side, room.active_color, room.draw_penalty]
   );
 
+  const canStack = (room.draw_penalty || 0) > 0 && myHand.some(isValidCard);
+
   // Organize opponents around the table relative to current player seat
   const mySeat = me?.seat_index ?? 0;
   const opponents = players
     .filter((p) => p.profile_id !== currentProfile?.id)
     .sort((a, b) => {
-      // Order clockwise relative to me
       const diffA = (a.seat_index - mySeat + players.length) % players.length;
       const diffB = (b.seat_index - mySeat + players.length) % players.length;
       return diffA - diffB;
@@ -331,19 +378,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         {/* Room Info & Side Indicator */}
         <div className="flex items-center gap-1.5 sm:gap-3">
           <div
-            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 rounded text-[10px] sm:text-xs font-bold uppercase tracking-wider ${isLight
+            className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg text-[10px] sm:text-xs font-black uppercase tracking-wider ${
+              isLight
                 ? 'bg-[#FFCC00] text-[#15191F]'
                 : 'bg-[#2D333B] text-white border border-[#404752]'
-              }`}
+            }`}
           >
-            <FlipHorizontal className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+            <FlipHorizontal className="w-3.5 h-3.5" />
             <span className="hidden xs:inline">{isLight ? 'Light Side' : 'Dark Side'}</span>
             <span className="xs:hidden">{isLight ? 'Light' : 'Dark'}</span>
           </div>
 
           <button
             onClick={handleCopyCode}
-            className="flex items-center gap-1 text-[10px] sm:text-xs font-mono font-medium text-[#9BA3AF] bg-[#1E232B] px-2 sm:px-3 py-1 rounded border border-[#2D333B] hover:text-white active:scale-95 transition-all touch-manipulation cursor-pointer"
+            className="flex items-center gap-1 text-[10px] sm:text-xs font-mono font-medium text-[#9BA3AF] bg-[#1E232B] px-2 sm:px-3 py-1 rounded-lg border border-[#2D333B] hover:text-white active:scale-95 transition-all touch-manipulation cursor-pointer"
             title="Click to copy room code"
           >
             <span className="text-[#9BA3AF] hidden xs:inline">Room:</span>
@@ -359,12 +407,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         {/* Action Banner / Turn Banner */}
         <div className="flex items-center px-1">
           <div
-            className={`px-2.5 sm:px-4 py-1 sm:py-1.5 rounded text-[10px] sm:text-xs font-bold flex items-center gap-1.5 transition-all max-w-[120px] xs:max-w-[170px] sm:max-w-none truncate ${isMyTurn
-                ? 'bg-[#FFCC00] text-[#15191F]'
+            className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all max-w-[130px] xs:max-w-[180px] sm:max-w-none truncate ${
+              isMyTurn
+                ? 'bg-[#FFCC00] text-[#15191F] shadow-[0_0_12px_rgba(255,204,0,0.3)] border border-amber-300'
                 : 'bg-[#1E232B] text-[#9BA3AF] border border-[#2D333B]'
-              }`}
+            }`}
           >
-            <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+            <Clock className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">{activePlayerName}</span>
           </div>
         </div>
@@ -377,7 +426,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               const next = toggleSoundMuted();
               setSoundMutedState(next);
             }}
-            className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-1.5 sm:p-2 rounded bg-[#1E232B] hover:bg-[#252B35] active:scale-95 border border-[#2D333B] text-[#9BA3AF] hover:text-white transition-all cursor-pointer flex items-center justify-center touch-manipulation"
+            className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-1.5 sm:p-2 rounded-lg bg-[#1E232B] hover:bg-[#252B35] active:scale-95 border border-[#2D333B] text-[#9BA3AF] hover:text-white transition-all cursor-pointer flex items-center justify-center touch-manipulation"
             title={soundMuted ? 'Unmute Sound' : 'Mute Sound'}
           >
             {soundMuted ? (
@@ -389,14 +438,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
           <button
             onClick={() => setShowRules(true)}
-            className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-1.5 sm:p-2 rounded bg-[#1E232B] hover:bg-[#252B35] active:scale-95 border border-[#2D333B] text-[#9BA3AF] hover:text-white transition-all cursor-pointer flex items-center justify-center touch-manipulation"
+            className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-1.5 sm:p-2 rounded-lg bg-[#1E232B] hover:bg-[#252B35] active:scale-95 border border-[#2D333B] text-[#9BA3AF] hover:text-white transition-all cursor-pointer flex items-center justify-center touch-manipulation"
             title="Rules"
           >
             <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FFCC00]" />
           </button>
           <button
             onClick={() => setShowLeaveConfirm(true)}
-            className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-1.5 sm:p-2 rounded bg-[#1E232B] hover:bg-red-950/40 active:scale-95 border border-[#2D333B] hover:border-[#ED1C24]/50 text-[#9BA3AF] hover:text-[#ED1C24] transition-all cursor-pointer flex items-center justify-center touch-manipulation"
+            className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-1.5 sm:p-2 rounded-lg bg-[#1E232B] hover:bg-red-950/40 active:scale-95 border border-[#2D333B] hover:border-[#ED1C24]/50 text-[#9BA3AF] hover:text-[#ED1C24] transition-all cursor-pointer flex items-center justify-center touch-manipulation"
             title="Leave Game"
           >
             <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -404,10 +453,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         </div>
       </header>
 
-      {/* Prominent Penalty Announcement Toast Banner */}
+      {/* Prominent Penalty Announcement Banner */}
       {penaltyAnnouncement && (
         <div className="absolute top-13 sm:top-14 inset-x-0 z-40 flex justify-center pointer-events-none px-4">
-          <div className="bg-[#ED1C24] border-2 border-white text-white text-xs sm:text-sm font-black px-4 py-1.5 rounded-full shadow-2xl animate-bounce flex items-center gap-2">
+          <div className="bg-[#ED1C24] border border-white/40 text-white text-xs sm:text-sm font-black px-4 py-1.5 rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
             <ShieldAlert className="w-4 h-4 stroke-[2.5]" />
             <span>{penaltyAnnouncement.message}</span>
           </div>
@@ -432,10 +481,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         </div>
       )}
 
+      {/* Desktop/Tablet Live Activity Feed Docked on Left Table Area */}
+      <div className="hidden sm:block absolute left-4 top-16 z-20 pointer-events-none">
+        <GameActivityFeed events={events} />
+      </div>
+
       {/* MAIN GAME TABLE (GSAP Ref) */}
       <main
         ref={boardRef}
-        className="relative z-10 flex-1 flex flex-col items-center justify-start sm:justify-evenly max-w-5xl mx-auto w-full px-1 xs:px-2 pt-3 sm:pt-4 pb-1 min-h-0"
+        className="relative z-10 flex-1 flex flex-col items-center justify-start sm:justify-evenly max-w-5xl mx-auto w-full px-1 xs:px-2 pt-2 sm:pt-4 pb-1 min-h-0"
         style={{ transformStyle: 'preserve-3d' }}
       >
         {/* Opponents Row (Top / Sides) */}
@@ -477,11 +531,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           ))}
         </div>
 
+        {/* Mobile-only compact Live Activity Feed ticker */}
+        <div className="flex sm:hidden w-full justify-center px-2 my-0.5 pointer-events-none">
+          <GameActivityFeed events={events.slice(-1)} className="max-w-xs" />
+        </div>
+
         {/* Central Arena: Direction Ring, Discard Pile, Draw Pile */}
         <div className="relative flex items-center justify-center gap-3 xs:gap-6 sm:gap-10 p-2.5 xs:p-4 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl bg-[#1E232B]/85 backdrop-blur-md border border-[#2D333B]/80 shadow-2xl">
           {/* Direction Indicator Widget */}
           <div
-            className="absolute -top-3 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-0.5 rounded bg-[#15191F] border border-[#2D333B] text-[10px] sm:text-[11px] font-bold text-[#9BA3AF]"
+            className="absolute -top-3 flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-0.5 rounded-lg bg-[#15191F] border border-[#2D333B] text-[10px] sm:text-[11px] font-bold text-[#9BA3AF]"
             title={`Direction: ${room.direction === 1 ? 'Clockwise' : 'Counter-Clockwise'}`}
           >
             {room.direction === 1 ? (
@@ -499,8 +558,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
           {/* Active Penalty Stack Badge */}
           {(room.draw_penalty || 0) > 0 && (
-            <div className="absolute -top-3.5 right-2 sm:right-4 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-0.5 rounded-full bg-[#ED1C24] text-white text-[9px] sm:text-[11px] font-black uppercase tracking-wider shadow-lg animate-pulse ring-2 ring-[#ED1C24]/50">
-              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white animate-ping" />
+            <div className="absolute -top-3.5 right-2 sm:right-4 flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#ED1C24] text-white text-[10px] sm:text-xs font-black uppercase tracking-wider shadow-lg border border-red-300/40">
+              <span className="w-2 h-2 rounded-full bg-white inline-block" />
               <span>STACK: +{room.draw_penalty} CARDS</span>
             </div>
           )}
@@ -524,10 +583,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
         {/* Turn Prompt Hint & Synchronized Turn Countdown */}
         {room.status === 'playing' && (
-          <div className="mt-1.5 xs:mt-2 sm:mt-3 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 px-2 text-center max-w-full">
+          <div className="mt-1.5 xs:mt-2 sm:mt-3 flex flex-col sm:flex-row items-center gap-1 sm:gap-2.5 px-2 text-center max-w-full">
             {room.pending_draw_decision ? (
-              <div className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black tracking-wider uppercase flex items-center gap-1.5 bg-[#1E232B] border border-[#FFCC00]/40 text-[#FFCC00] shadow-md">
-                <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-pulse" />
+              <div className="px-3 py-1 rounded-full text-[10px] sm:text-xs font-black tracking-wider uppercase flex items-center gap-1.5 bg-[#1E232B] border border-[#FFCC00]/40 text-[#FFCC00] shadow-md">
+                <Clock className="w-3.5 h-3.5" />
                 <span>
                   {room.pending_draw_decision.player_id === me?.profile_id
                     ? 'DECISION PENDING'
@@ -537,29 +596,31 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             ) : (
               turnSecondsLeft !== null && (
                 <div
-                  className={`px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black tracking-wider uppercase flex items-center gap-1.5 transition-all shadow-md ${
+                  className={`px-3 py-1 rounded-full text-[10px] sm:text-xs font-black tracking-wider uppercase flex items-center gap-1.5 transition-all shadow-md ${
                     turnSecondsLeft <= 5
-                      ? 'bg-[#ED1C24] text-white animate-pulse ring-2 ring-[#ED1C24]/60'
+                      ? 'bg-[#D32F2F] text-white border border-[#FF8A80] shadow-[0_0_8px_rgba(211,47,47,0.3)]'
                       : turnSecondsLeft <= 10
-                      ? 'bg-[#E65100] text-white'
+                      ? 'bg-[#E65100] text-white border border-[#FFB74D]/40'
                       : 'bg-[#15191F] border border-[#2D333B] text-[#FFCC00]'
                   }`}
                 >
-                  <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                  <Clock className="w-3.5 h-3.5" />
                   <span>TURN: {turnSecondsLeft}s</span>
                 </div>
               )
             )}
 
             {isMyTurn && !room.pending_draw_decision && (
-              <div className="text-[11px] sm:text-sm font-bold tracking-wide flex items-center gap-1.5">
+              <div className="text-[11px] sm:text-sm font-black tracking-wide flex items-center gap-1.5">
                 {(room.draw_penalty || 0) > 0 ? (
-                  <span className="text-[#FF8080] font-black animate-pulse">
-                    🔥 PENALTY ACTIVE: Stack penalty (+{room.draw_penalty}) or draw!
+                  <span className="text-[#FF8080] font-black">
+                    {canStack
+                      ? `🔥 DRAW ${room.draw_penalty} OR STACK PENALTY`
+                      : `⚠️ PENALTY ACTIVE (+${room.draw_penalty}) • DRAW FROM PILE`}
                   </span>
                 ) : (
                   <span className="text-[#FFCC00]">
-                    YOUR TURN: Play a matching card or draw
+                    YOUR TURN • Play a matching card or draw
                   </span>
                 )}
               </div>
@@ -589,6 +650,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               ? penaltyAnnouncement.message
               : null
           }
+          turnSecondsLeft={turnSecondsLeft}
+          drawPenalty={room.draw_penalty || 0}
+          canStack={canStack}
         />
       </footer>
 
