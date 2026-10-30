@@ -3,6 +3,8 @@
 import React, { useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { GamePlayer, GameRoom } from '@/lib/game/types';
+import { useSettings } from '@/lib/settings/SettingsContext';
+import { soundManager } from '@/lib/audio/soundManager';
 import { UfLogo } from '../common/UfLogo';
 import { Crown, Home, RotateCcw, Trophy, UserMinus } from 'lucide-react';
 
@@ -24,16 +26,29 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   onRematch,
   onReturnLobby,
 }) => {
+  const { settings } = useSettings();
   const hasFiredRef = useRef(false);
 
   useEffect(() => {
     if (isOpen && !hasFiredRef.current) {
       hasFiredRef.current = true;
-      const isReducedMotion =
-        typeof window !== 'undefined' &&
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-      if (!isReducedMotion) {
+      // Play victory or defeat sound based on authoritative winner
+      const isWinner = Boolean(room.winner_id && room.winner_id === currentProfileId);
+      if (isWinner) {
+        soundManager.playVictory();
+      } else if (room.winner_id) {
+        soundManager.playDefeat();
+      }
+
+      // Respect animation settings and prefers-reduced-motion
+      const isReducedMotion =
+        settings.animation_intensity === 'reduced' ||
+        !settings.animations_enabled ||
+        (typeof window !== 'undefined' &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+      if (!isReducedMotion && settings.animations_enabled) {
         confetti({
           particleCount: 90,
           spread: 70,
@@ -44,7 +59,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     } else if (!isOpen) {
       hasFiredRef.current = false;
     }
-  }, [isOpen]);
+  }, [isOpen, room.winner_id, currentProfileId, settings.animations_enabled, settings.animation_intensity]);
 
   if (!isOpen) return null;
 

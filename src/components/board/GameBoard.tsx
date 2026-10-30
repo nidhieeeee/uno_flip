@@ -13,9 +13,11 @@ import { GameActivityFeed } from './GameActivityFeed';
 import { ColorPickerModal } from '../modals/ColorPickerModal';
 import { GameOverModal } from '../modals/GameOverModal';
 import { HowToPlayModal } from '../modals/HowToPlayModal';
+import { SettingsModal } from '../modals/SettingsModal';
 import { DrawDecisionModal } from '../modals/DrawDecisionModal';
 import { UfLogo } from '../common/UfLogo';
-import { isSoundMuted, playFlipSound, playPenaltySound, toggleSoundMuted } from '@/lib/audio/sound';
+import { useSettings } from '@/lib/settings/SettingsContext';
+import { soundManager } from '@/lib/audio/soundManager';
 import {
   launchCardPlayOverlay,
   launchOpponentPlayOverlay,
@@ -28,11 +30,10 @@ import {
   LogOut,
   RotateCcw,
   RotateCw,
+  Settings,
   ShieldAlert,
   Sparkles,
   UserMinus,
-  Volume2,
-  VolumeX,
   Wifi,
   WifiOff,
 } from 'lucide-react';
@@ -70,6 +71,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const [pendingCard, setPendingCard] = useState<UnoFlipCard | null>(null);
   const [isFromDrawDecision, setIsFromDrawDecision] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [penalizedPlayerId, setPenalizedPlayerId] = useState<string | null>(null);
   const [penaltyAnnouncement, setPenaltyAnnouncement] = useState<{
@@ -77,10 +79,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     isTargetMe: boolean;
   } | null>(null);
   const [actionBanner, setActionBanner] = useState<string | null>(null);
-  const [soundMuted, setSoundMutedState] = useState(isSoundMuted());
+  const { settings } = useSettings();
   const [currentTurnTime, setCurrentTurnTime] = useState(() => Date.now());
   const [events, setEvents] = useState<FormattedGameEvent[]>([]);
   const recordedEventKeysRef = useRef<Set<string>>(new Set());
+  const handledSoundActionKeysRef = useRef<Set<string>>(new Set());
+  const prevIsMyTurnRef = useRef<boolean>(false);
+  const lastWarningSecondRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Suspend countdown if draw decision is pending or no deadline is set
@@ -126,11 +131,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   useEffect(() => {
     if (prevSideRef.current !== room.current_side && boardRef.current) {
       prevSideRef.current = room.current_side;
-      playFlipSound();
+      soundManager.playFlipCard();
+
+      if (!settings.animations_enabled) {
+        return;
+      }
 
       const isReducedMotion =
-        typeof window !== 'undefined' &&
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        settings.animation_intensity === 'reduced' ||
+        (typeof window !== 'undefined' &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
       if (isReducedMotion) {
         gsap.fromTo(
@@ -153,7 +163,71 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         );
       }
     }
-  }, [room.current_side]);
+  }, [room.current_side, settings.animations_enabled, settings.animation_intensity]);
+
+  // Turn start notification sound
+  useEffect(() => {
+    if (!prevIsMyTurnRef.current && isMyTurn && room.status === 'playing') {
+      soundManager.playTurnStart();
+    }
+    prevIsMyTurnRef.current = isMyTurn;
+  }, [isMyTurn, room.status]);
+
+  // Turn timer warning sound (soft tick on last 5 seconds, once per second)
+  useEffect(() => {
+    if (
+      isMyTurn &&
+      room.status === 'playing' &&
+      turnSecondsLeft !== null &&
+      turnSecondsLeft <= 5 &&
+      turnSecondsLeft > 0
+    ) {
+      if (lastWarningSecondRef.current !== turnSecondsLeft) {
+        lastWarningSecondRef.current = turnSecondsLeft;
+        soundManager.playTurnWarning();
+      }
+    } else if (!isMyTurn || turnSecondsLeft === null || turnSecondsLeft > 5) {
+      lastWarningSecondRef.current = null;
+    }
+  }, [isMyTurn, room.status, turnSecondsLeft]);
+
+  // Authoritative confirmed game events sound triggers (deduplicated)
+  useEffect(() => {
+    if (!room.last_action) return;
+    const action = room.last_action;
+    const key = getActionUniqueKey(action);
+
+    if (handledSoundActionKeysRef.current.has(key)) return;
+    handledSoundActionKeysRef.current.add(key);
+
+    if (action.type === 'play') {
+      const isFlipCard =
+        action.card &&
+        (action.card.light.type === 'flip' || action.card.dark.type === 'flip');
+      const isStackPenalty = (room.draw_penalty || 0) > 0;
+
+      if (isFlipCard) {
+        soundManager.playFlipCard();
+      } else if (isStackPenalty) {
+        soundManager.playPenaltyStack(room.draw_penalty || 1);
+      } else {
+        soundManager.playCardPlay();
+      }
+    } else if (action.type === 'draw') {
+      const count = action.drawnCount || 1;
+      if (count > 1) {
+        soundManager.playReceivePenalty(count);
+      } else {
+        soundManager.playCardDraw();
+      }
+    } else if (action.type === 'challenge_uno') {
+      soundManager.playReceivePenalty(2);
+    } else if (action.type === 'call_uno') {
+      soundManager.playCallUno();
+    } else if (action.type === 'flip') {
+      soundManager.playFlipCard();
+    }
+  }, [room.last_action, room.draw_penalty]);
 
   // Synchronize Live Game Activity Feed with authoritative confirmed events
   useEffect(() => {
@@ -227,22 +301,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         });
       }, 0);
 
-      // Play penalty sound
-      playPenaltySound();
-
-      // Trigger GSAP Flying cards animation
-      if (typeof window !== 'undefined') {
+      // Trigger GSAP Flying cards animation if animations are enabled
+      if (typeof window !== 'undefined' && settings.animations_enabled) {
         const targetEl = isTargetMe
           ? document.getElementById('player-hand-container')
           : document.getElementById(`opponent-card-stack-${targetId}`) ||
             document.getElementById(`opponent-seat-${targetId}`);
 
         if (targetEl) {
+          const isReduced = settings.animation_intensity === 'reduced';
           // Subtle shake target area
           gsap.fromTo(
             targetEl,
-            { x: -6 },
-            { x: 0, duration: 0.35, ease: 'power2.out' }
+            { x: isReduced ? -2 : -6 },
+            { x: 0, duration: isReduced ? 0.15 : 0.35, ease: 'power2.out' }
           );
 
           // Fly penalty cards from draw pile to opponent seat using authentic UNO FLIP card-back
@@ -426,22 +498,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           </div>
         </div>
 
-        {/* Sound, Rules & Exit */}
+        {/* Settings, Rules & Exit */}
         <div className="flex items-center gap-1 sm:gap-2">
-          {/* Sound Mute Toggle Button */}
+          {/* Settings Button */}
           <button
-            onClick={() => {
-              const next = toggleSoundMuted();
-              setSoundMutedState(next);
-            }}
-            className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-1.5 sm:p-2 rounded-lg bg-[#1E232B] hover:bg-[#252B35] active:scale-95 border border-[#2D333B] text-[#9BA3AF] hover:text-white transition-all cursor-pointer flex items-center justify-center touch-manipulation"
-            title={soundMuted ? 'Unmute Sound' : 'Mute Sound'}
+            onClick={() => setShowSettings(true)}
+            className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-1.5 sm:p-2 rounded-lg bg-[#1E232B] hover:bg-[#252B35] active:scale-95 border border-[#2D333B] text-[#9BA3AF] hover:text-[#FFCC00] transition-all cursor-pointer flex items-center justify-center touch-manipulation"
+            title="Game Settings"
           >
-            {soundMuted ? (
-              <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#ED1C24]" />
-            ) : (
-              <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#27AE60]" />
-            )}
+            <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FFCC00]" />
           </button>
 
           <button
@@ -725,6 +790,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       />
 
       <HowToPlayModal isOpen={showRules} onClose={() => setShowRules(false)} />
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
       {/* Leave Game Confirmation Modal */}
       {showLeaveConfirm && (

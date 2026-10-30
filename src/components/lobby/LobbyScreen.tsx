@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { GamePlayer, GameRoom, PlayerProfile } from '@/lib/game/types';
 import { UfLogo } from '../common/UfLogo';
+import { SettingsModal } from '../modals/SettingsModal';
 import {
   Check,
   CheckCircle2,
@@ -12,6 +13,7 @@ import {
   HelpCircle,
   LogOut,
   Play,
+  Settings,
   Share2,
   Users,
 } from 'lucide-react';
@@ -42,6 +44,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   const [copied, setCopied] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [nicknameInput, setNicknameInput] = useState(currentProfile?.nickname || '');
+  const [showSettings, setShowSettings] = useState(false);
 
   const isHost = me?.is_host ?? false;
   const canStart = isHost && players.length >= 2;
@@ -93,6 +96,14 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
+          <button
+            onClick={() => setShowSettings(true)}
+            className="min-h-[36px] sm:min-h-[40px] flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-[#2D333B] text-xs text-[#9BA3AF] hover:text-[#FFCC00] hover:bg-[#1E232B] active:scale-95 transition-all touch-manipulation cursor-pointer"
+            title="Game Settings"
+          >
+            <Settings className="w-3.5 h-3.5 text-[#FFCC00]" />
+            <span className="hidden xs:inline">Settings</span>
+          </button>
           <button
             onClick={onOpenHowToPlay}
             className="min-h-[36px] sm:min-h-[40px] flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-[#2D333B] text-xs text-[#9BA3AF] hover:text-white hover:bg-[#1E232B] active:scale-95 transition-all touch-manipulation cursor-pointer"
@@ -288,6 +299,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
       <footer className="w-full max-w-3xl mx-auto text-center text-xs text-[#9BA3AF] pt-3 border-t border-[#2D333B]">
         2–4 players. The host starts when players are ready.
       </footer>
+
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>
   );
 };

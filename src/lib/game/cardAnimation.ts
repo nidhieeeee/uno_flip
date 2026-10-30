@@ -4,6 +4,38 @@ import { Side } from './types';
 // Keep track of active in-flight flying card overlays by cardId to prevent duplicate animations
 const activeFlyingCardIds = new Set<string>();
 
+export interface AnimationConfig {
+  animationsEnabled?: boolean;
+  animationIntensity?: 'full' | 'reduced';
+}
+
+/**
+ * Reads local animation configuration if not explicitly passed
+ */
+export function getCurrentAnimationConfig(): AnimationConfig {
+  if (typeof window === 'undefined') {
+    return { animationsEnabled: true, animationIntensity: 'full' };
+  }
+  try {
+    const raw =
+      localStorage.getItem('uno_player_preferences') ||
+      localStorage.getItem('uno_guest_preferences');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        animationsEnabled: parsed.animations_enabled ?? true,
+        animationIntensity: parsed.animation_intensity ?? 'full',
+      };
+    }
+  } catch {}
+
+  const isReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return {
+    animationsEnabled: true,
+    animationIntensity: isReducedMotion ? 'reduced' : 'full',
+  };
+}
+
 /**
  * Checks if a card is currently undergoing an in-flight play travel animation.
  */
@@ -74,9 +106,16 @@ export function createCardBackDOMElement(side: Side, width = 36, height = 52): H
 export function launchCardPlayOverlay(
   sourceEl: HTMLElement | null,
   cardId: string,
-  onComplete?: () => void
+  onComplete?: () => void,
+  config?: AnimationConfig
 ): boolean {
   if (typeof document === 'undefined' || !sourceEl) return false;
+
+  const currentConfig = config || getCurrentAnimationConfig();
+  if (currentConfig.animationsEnabled === false) {
+    if (onComplete) onComplete();
+    return true;
+  }
 
   // Prevent duplicate travel animations for the same card
   if (activeFlyingCardIds.has(cardId)) {
@@ -109,14 +148,14 @@ export function launchCardPlayOverlay(
 
   document.body.appendChild(overlay);
 
-  const isReducedMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const isReduced =
+    currentConfig.animationIntensity === 'reduced' ||
+    (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   const dx = discardRect.left + discardRect.width / 2 - (cardRect.left + cardRect.width / 2);
   const dy = discardRect.top + discardRect.height / 2 - (cardRect.top + cardRect.height / 2);
   const targetScale = Math.min(1.15, discardRect.width / Math.max(1, cardRect.width));
-  const rotation = isReducedMotion
+  const rotation = isReduced
     ? 0
     : (cardId.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % 15) - 7;
 
@@ -125,7 +164,7 @@ export function launchCardPlayOverlay(
     y: dy,
     scale: targetScale,
     rotation,
-    duration: isReducedMotion ? 0.05 : 0.22, // 220ms snappy travel
+    duration: isReduced ? 0.08 : 0.22, // 80ms if reduced, 220ms if full
     ease: 'power2.out',
     onComplete: () => {
       activeFlyingCardIds.delete(cardId);
@@ -143,9 +182,16 @@ export function launchCardPlayOverlay(
 export function launchOpponentPlayOverlay(
   opponentSeatEl: HTMLElement | null,
   side: Side,
-  onComplete?: () => void
+  onComplete?: () => void,
+  config?: AnimationConfig
 ): boolean {
   if (typeof document === 'undefined' || !opponentSeatEl) return false;
+
+  const currentConfig = config || getCurrentAnimationConfig();
+  if (currentConfig.animationsEnabled === false) {
+    if (onComplete) onComplete();
+    return true;
+  }
 
   const discardEl = document.getElementById('discard-pile-container');
   if (!discardEl) return false;
@@ -158,9 +204,9 @@ export function launchOpponentPlayOverlay(
   overlay.style.top = `${sourceRect.top + sourceRect.height / 2 - 23}px`;
   document.body.appendChild(overlay);
 
-  const isReducedMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const isReduced =
+    currentConfig.animationIntensity === 'reduced' ||
+    (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   const dx = discardRect.left + discardRect.width / 2 - (sourceRect.left + sourceRect.width / 2);
   const dy = discardRect.top + discardRect.height / 2 - (sourceRect.top + sourceRect.height / 2);
@@ -169,8 +215,8 @@ export function launchOpponentPlayOverlay(
     x: dx,
     y: dy,
     scale: 1.15,
-    rotation: isReducedMotion ? 0 : 25,
-    duration: isReducedMotion ? 0.05 : 0.22,
+    rotation: isReduced ? 0 : 25,
+    duration: isReduced ? 0.08 : 0.22,
     ease: 'power2.out',
     onComplete: () => {
       overlay.remove();
@@ -188,9 +234,16 @@ export function launchOpponentDrawOverlay(
   opponentSeatEl: HTMLElement | null,
   side: Side,
   count = 1,
-  onComplete?: () => void
+  onComplete?: () => void,
+  config?: AnimationConfig
 ): boolean {
   if (typeof document === 'undefined' || !opponentSeatEl) return false;
+
+  const currentConfig = config || getCurrentAnimationConfig();
+  if (currentConfig.animationsEnabled === false) {
+    if (onComplete) onComplete();
+    return true;
+  }
 
   const deckEl = document.getElementById('deck-pile-container');
   if (!deckEl) return false;
@@ -198,9 +251,9 @@ export function launchOpponentDrawOverlay(
   const deckRect = deckEl.getBoundingClientRect();
   const targetRect = opponentSeatEl.getBoundingClientRect();
 
-  const isReducedMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const isReduced =
+    currentConfig.animationIntensity === 'reduced' ||
+    (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   const cardsToFly = Math.min(count, 3);
   let finished = 0;
@@ -213,15 +266,15 @@ export function launchOpponentDrawOverlay(
 
     const dx = targetRect.left + targetRect.width / 2 - (deckRect.left + deckRect.width / 2);
     const dy = targetRect.top + targetRect.height / 2 - (deckRect.top + deckRect.height / 2);
-    const delay = isReducedMotion ? 0 : i * 0.04;
+    const delay = isReduced ? 0 : i * 0.04;
 
     gsap.to(overlay, {
       x: dx,
       y: dy,
       scale: 0.85,
-      rotation: isReducedMotion ? 0 : i === 0 ? -15 : 15,
+      rotation: isReduced ? 0 : i === 0 ? -15 : 15,
       delay,
-      duration: isReducedMotion ? 0.05 : 0.22,
+      duration: isReduced ? 0.08 : 0.22,
       ease: 'power2.out',
       onComplete: () => {
         overlay.remove();

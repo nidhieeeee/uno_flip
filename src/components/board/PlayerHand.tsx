@@ -5,7 +5,8 @@ import gsap from 'gsap';
 import { Side, UnoFlipCard } from '@/lib/game/types';
 import { UnoCard } from '../card/UnoCard';
 import { computeHandLayout } from '@/lib/game/handLayout';
-import { playUnoCallSound } from '@/lib/audio/sound';
+import { soundManager } from '@/lib/audio/soundManager';
+import { useSettings } from '@/lib/settings/SettingsContext';
 import { launchCardPlayOverlay } from '@/lib/game/cardAnimation';
 import { Check, Clock, Eye, Flame, ShieldAlert, Sparkles } from 'lucide-react';
 
@@ -158,6 +159,7 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
   drawPenalty = 0,
   canStack = false,
 }) => {
+  const { settings } = useSettings();
   const [peekOtherSide, setPeekOtherSide] = useState(false);
   const [prevActiveSide, setPrevActiveSide] = useState(activeSide);
   if (activeSide !== prevActiveSide) {
@@ -297,8 +299,22 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
     });
 
     const isReducedMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      settings.animation_intensity === 'reduced' ||
+      !settings.animations_enabled ||
+      (typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+    // If animations are completely disabled by user settings, skip all GSAP tweens
+    if (!settings.animations_enabled) {
+      prevPositionsRef.current.clear();
+      restingPositions.forEach((rect, id) => {
+        prevPositionsRef.current.set(id, { left: rect.left, top: rect.top });
+      });
+      prevCardsRef.current = cards;
+      prevCardIdsRef.current = currentIds;
+      prevContainerWidthRef.current = containerWidth;
+      return;
+    }
 
     // 4. Smoothly slide existing cards into their new layout slots
     cards.forEach((c) => {
@@ -319,7 +335,7 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
             {
               x: 0,
               y: 0,
-              duration: isReducedMotion ? 0.01 : 0.16,
+              duration: isReducedMotion ? 0.08 : 0.16,
               ease: 'power2.out',
               clearProps: 'transform',
             }
@@ -342,7 +358,7 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
       if (deckRect) {
         const dx = deckRect.left + deckRect.width / 2 - (newRect.left + newRect.width / 2);
         const dy = deckRect.top + deckRect.height / 2 - (newRect.top + newRect.height / 2);
-        const scale = Math.min(1.15, deckRect.width / Math.max(1, newRect.width));
+        const scale = isReducedMotion ? 1 : Math.min(1.15, deckRect.width / Math.max(1, newRect.width));
 
         gsap.fromTo(
           el,
@@ -360,7 +376,7 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
             opacity: 1,
             rotation: 0,
             delay,
-            duration: isReducedMotion ? 0.01 : 0.22,
+            duration: isReducedMotion ? 0.08 : 0.22,
             ease: 'power2.out',
             clearProps: 'transform,opacity',
           }
@@ -374,7 +390,7 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
             opacity: 1,
             scale: 1,
             delay,
-            duration: isReducedMotion ? 0.01 : 0.2,
+            duration: isReducedMotion ? 0.08 : 0.2,
             ease: 'power2.out',
             clearProps: 'transform,opacity',
           }
@@ -395,7 +411,7 @@ const PlayerHandComponent: React.FC<PlayerHandProps> = ({
   const handleCallUnoClick = async () => {
     if (isCallingUno || hasCalledUno || cards.length !== 1) return;
     setIsCallingUno(true);
-    playUnoCallSound();
+    soundManager.playCallUno();
     setJustCalledUno(true);
     setTimeout(() => setJustCalledUno(false), 2000);
     try {

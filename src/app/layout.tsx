@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
+import { SettingsProvider } from '@/lib/settings/SettingsContext';
 import './globals.css';
 
 const inter = Inter({
@@ -141,7 +142,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-[#15191F] text-white font-sans overflow-x-hidden">
-        {children}
+        <SettingsProvider>
+          {children}
+        </SettingsProvider>
       </body>
     </html>
   );

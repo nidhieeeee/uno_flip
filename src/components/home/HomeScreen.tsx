@@ -4,8 +4,9 @@ import React, { useState } from 'react';
 import { PlayerProfile } from '@/lib/game/types';
 import { apiFetch, setClientPlayerToken } from '@/lib/game/clientSession';
 import { HowToPlayModal } from '../modals/HowToPlayModal';
+import { SettingsModal } from '../modals/SettingsModal';
 import { UfLogo } from '../common/UfLogo';
-import { ArrowRight, HelpCircle, Plus, User } from 'lucide-react';
+import { ArrowRight, HelpCircle, Plus, Settings, User } from 'lucide-react';
 
 interface HomeScreenProps {
   initialProfile: PlayerProfile | null;
@@ -23,6 +24,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showRules, setShowRules] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const nickname = customNickname ?? (initialProfile?.nickname || '');
   const joinCode = customJoinCode ?? (initialRoomCode ? initialRoomCode.toUpperCase() : '');
@@ -117,13 +119,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <span className="font-extrabold text-sm tracking-wide text-white">UNO FLIP</span>
         </div>
 
-        <button
-          onClick={() => setShowRules(true)}
-          className="min-h-[40px] flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#2D333B] text-xs font-medium text-[#9BA3AF] hover:text-white hover:bg-[#1E232B] active:scale-95 transition-all touch-manipulation cursor-pointer"
-        >
-          <HelpCircle className="w-3.5 h-3.5 text-[#FFCC00]" />
-          <span>Rules</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowSettings(true)}
+            className="min-h-[40px] flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#2D333B] text-xs font-medium text-[#9BA3AF] hover:text-[#FFCC00] hover:bg-[#1E232B] active:scale-95 transition-all touch-manipulation cursor-pointer"
+            title="Game Settings"
+          >
+            <Settings className="w-3.5 h-3.5 text-[#FFCC00]" />
+            <span className="hidden xs:inline">Settings</span>
+          </button>
+
+          <button
+            onClick={() => setShowRules(true)}
+            className="min-h-[40px] flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#2D333B] text-xs font-medium text-[#9BA3AF] hover:text-white hover:bg-[#1E232B] active:scale-95 transition-all touch-manipulation cursor-pointer"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-[#FFCC00]" />
+            <span>Rules</span>
+          </button>
+        </div>
       </header>
 
       {/* Main Card Container */}
@@ -219,6 +232,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       </footer>
 
       <HowToPlayModal isOpen={showRules} onClose={() => setShowRules(false)} />
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>
   );
 };

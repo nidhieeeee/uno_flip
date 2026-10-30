@@ -1,29 +1,25 @@
-// Web Audio API sound effects for classic card game actions (no external audio assets needed)
+/**
+ * Backward compatibility wrapper delegating to modern SoundManager.
+ * Preserves existing signatures while wiring to unified settings & audio context.
+ */
 
-let audioCtx: AudioContext | null = null;
+import { soundManager } from './soundManager';
 
-function getAudioContext(): AudioContext | null {
-  if (typeof window === 'undefined') return null;
-  if (!audioCtx) {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (AudioContextClass) {
-      audioCtx = new AudioContextClass();
-    }
-  }
-  if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(() => {});
-  }
-  return audioCtx;
-}
+let memoryMuted = false;
 
 export function isSoundMuted(): boolean {
-  if (typeof window === 'undefined') return false;
-  return localStorage.getItem('uno_flip_sound_muted') === 'true';
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    return localStorage.getItem('uno_flip_sound_muted') === 'true';
+  }
+  return memoryMuted;
 }
 
 export function setSoundMuted(muted: boolean): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem('uno_flip_sound_muted', muted ? 'true' : 'false');
+  memoryMuted = muted;
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    localStorage.setItem('uno_flip_sound_muted', muted ? 'true' : 'false');
+  }
+  soundManager.updateSettings(!muted, true, muted ? 0 : 80);
 }
 
 export function toggleSoundMuted(): boolean {
@@ -33,119 +29,42 @@ export function toggleSoundMuted(): boolean {
   return next;
 }
 
-/**
- * Plays a short, distinct penalty buzzer sound when a player is caught forgetting UNO.
- */
-export function playPenaltySound(): void {
-  if (isSoundMuted()) return;
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-
-    const now = ctx.currentTime;
-
-    // Two rapid descending sawtooth buzz tones
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(320, now);
-    osc.frequency.exponentialRampToValueAtTime(160, now + 0.18);
-    osc.frequency.setValueAtTime(260, now + 0.2);
-    osc.frequency.exponentialRampToValueAtTime(130, now + 0.42);
-
-    gain.gain.setValueAtTime(0.18, now);
-    gain.gain.linearRampToValueAtTime(0.18, now + 0.35);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(now);
-    osc.stop(now + 0.45);
-  } catch {
-    // Audio playback error safely ignored
-  }
+export function playPenaltySound(count?: number): void {
+  soundManager.playReceivePenalty(count || 2);
 }
 
-/**
- * Plays a cheerful celebratory chime when a player calls UNO.
- */
 export function playUnoCallSound(): void {
-  if (isSoundMuted()) return;
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-
-    const now = ctx.currentTime;
-    const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
-
-    notes.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, now + idx * 0.08);
-
-      gain.gain.setValueAtTime(0.15, now + idx * 0.08);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.25);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(now + idx * 0.08);
-      osc.stop(now + idx * 0.08 + 0.26);
-    });
-  } catch {
-    // Audio playback error safely ignored
-  }
+  soundManager.playCallUno();
 }
 
-/**
- * Plays a dynamic whoosh / flip sound effect when the deck or game flips sides.
- */
+export function playUnoSound(): void {
+  soundManager.playCallUno();
+}
+
 export function playFlipSound(): void {
-  if (isSoundMuted()) return;
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
+  soundManager.playFlipCard();
+}
 
-    const now = ctx.currentTime;
+export function playCardDrawSound(): void {
+  soundManager.playCardDraw();
+}
 
-    // Resonant whoosh sweep
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+export function playCardPlaySound(): void {
+  soundManager.playCardPlay();
+}
 
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(600, now);
-    osc.frequency.exponentialRampToValueAtTime(150, now + 0.28);
+export function playTurnStartSound(): void {
+  soundManager.playTurnStart();
+}
 
-    gain.gain.setValueAtTime(0.2, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+export function playTurnWarningSound(): void {
+  soundManager.playTurnWarning();
+}
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+export function playVictorySound(): void {
+  soundManager.playVictory();
+}
 
-    osc.start(now);
-    osc.stop(now + 0.3);
-
-    // Followed by a crisp snap/landing
-    const snapOsc = ctx.createOscillator();
-    const snapGain = ctx.createGain();
-
-    snapOsc.type = 'triangle';
-    snapOsc.frequency.setValueAtTime(350, now + 0.15);
-    snapOsc.frequency.exponentialRampToValueAtTime(90, now + 0.35);
-
-    snapGain.gain.setValueAtTime(0.12, now + 0.15);
-    snapGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-
-    snapOsc.connect(snapGain);
-    snapGain.connect(ctx.destination);
-
-    snapOsc.start(now + 0.15);
-    snapOsc.stop(now + 0.35);
-  } catch {
-    // Audio playback error safely ignored
-  }
+export function playDefeatSound(): void {
+  soundManager.playDefeat();
 }
